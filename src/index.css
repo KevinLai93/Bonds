@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Financial Professional Design System - Bond Trading Platform */
+
+@layer base {
+  :root {
+    /* A4 Paper Dimensions */
+    --a4-w: 210mm;
+    --a4-h: 297mm;
+    --a4-margin: 12mm;
+    --preview-scale: 0.8;
+    
+    /* Core colors - Financial Professional Theme */
+    --background: 250 100% 99%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Financial Blue Theme */
+    --primary: 215 88% 52%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 215 88% 62%;
+
+    --secondary: 215 25% 95%;
+    --secondary-foreground: 215 25% 15%;
+
+    --muted: 215 25% 96%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 215 25% 94%;
+    --accent-foreground: 215 25% 15%;
+
+    /* Financial specific colors */
+    --success: 145 65% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 95% 55%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI Elements */
+    --border: 215 25% 88%;
+    --input: 215 25% 92%;
+    --ring: 215 88% 52%;
+
+    /* Dynamic Brand Colors - Updated by logo analysis */
+    --brand-50: 0 85% 97%;
+    --brand-100: 0 85% 94%;
+    --brand-200: 0 85% 89%;
+    --brand-300: 0 85% 82%;
+    --brand-400: 0 85% 71%;
+    --brand-500: 0 85% 59%;
+    --brand-600: 0 85% 47%;
+    --brand-700: 0 85% 37%;
+    --brand-800: 0 85% 29%;
+    --brand-900: 0 85% 23%;
+    --brand: var(--brand-600);
+    --brand-foreground: 0 0% 100%;
+
+    /* Financial gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-hero: linear-gradient(135deg, hsl(215 88% 52%), hsl(225 75% 45%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(215 25% 98%));
+    --gradient-brand: linear-gradient(135deg, hsl(var(--brand-500)), hsl(var(--brand-600)));
+
+    /* Professional shadows */
+    --shadow-card: 0 2px 10px -2px hsl(215 25% 15% / 0.08);
+    --shadow-hover: 0 4px 20px -4px hsl(215 88% 52% / 0.15);
+    --shadow-financial: 0 8px 32px -8px hsl(215 25% 15% / 0.12);
+    --shadow-brand: 0 4px 20px -4px hsl(var(--brand-600) / 0.15);
+
+    /* Typography */
+    --font-financial: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Financial Dark Theme */
+    --background: 215 25% 8%;
+    --foreground: 215 25% 95%;
+
+    --card: 215 25% 10%;
+    --card-foreground: 215 25% 95%;
+
+    --popover: 215 25% 10%;
+    --popover-foreground: 215 25% 95%;
+
+    --primary: 215 88% 62%;
+    --primary-foreground: 215 25% 8%;
+    --primary-glow: 215 88% 72%;
+
+    --secondary: 215 25% 15%;
+    --secondary-foreground: 215 25% 85%;
+
+    --muted: 215 25% 12%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 215 25% 14%;
+    --accent-foreground: 215 25% 85%;
+
+    /* Financial specific dark colors */
+    --success: 145 65% 55%;
+    --success-foreground: 215 25% 8%;
+    --warning: 35 95% 65%;
+    --warning-foreground: 215 25% 8%;
+    --destructive: 0 85% 70%;
+    --destructive-foreground: 215 25% 8%;
+
+    /* UI Elements */
+    --border: 215 25% 18%;
+    --input: 215 25% 15%;
+    --ring: 215 88% 62%;
+
+    --sidebar-background: 215 25% 8%;
+    --sidebar-foreground: 215 25% 85%;
+    --sidebar-primary: 215 88% 62%;
+    --sidebar-primary-foreground: 215 25% 8%;
+    --sidebar-accent: 215 25% 12%;
+    --sidebar-accent-foreground: 215 25% 85%;
+    --sidebar-border: 215 25% 18%;
+    --sidebar-ring: 215 88% 62%;
+  }
+
+  /* A4 Layout Variants */
+  .landscape {
+    --a4-w: 297mm;
+    --a4-h: 210mm;
+  }
+
+  /* A4 Bond Card Container */
+  #bondA4 {
+    width: var(--a4-w);
+    height: var(--a4-h);
+    padding: var(--a4-margin);
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    aspect-ratio: 210 / 297;
+    overflow: hidden;
+    transform-origin: top left;
+    position: relative;
+  }
+
+  /* Preview Wrapper for Responsive Scaling */
+  .preview-wrap {
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+  }
+
+  .preview-wrap #bondA4 {
+    transform: scale(var(--preview-scale));
+    transform-origin: top center;
+  }
+
+  /* Print Styles - Fixed A4 Single Page */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  @media print {
+    html, body {
+      margin: 0;
+      background: #fff;
+    }
+    
+    #bondA4 {
+      width: 210mm !important;
+      height: 297mm !important;
+      padding: 12mm !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      transform: none !important;
+    }
+    
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  /* Export Mode Overrides */
+  [data-export="true"] {
+    overflow: visible !important;
+    transform: none !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
