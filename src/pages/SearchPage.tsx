@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Filter, Download, Home } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,12 +26,120 @@ import { sampleBond, type Bond, filterOptions } from '@/types/bond';
 import { useBondSearch } from '@/contexts/BondSearchContext';
 import Header from '@/components/Header';
 import ISINSearchBox from '@/components/ISINSearchBox';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 const SearchPage = () => {
-  const { bond } = useBondSearch();
+  const { bond, extendedBond } = useBondSearch();
+  const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // 檢查是否有搜尋結果，如果沒有則重定向到首頁
+  useEffect(() => {
+    if (!bond && !extendedBond) {
+      // 沒有搜尋結果時，重定向到首頁
+      navigate('/');
+    }
+  }, [bond, extendedBond, navigate]);
   
   // Use searched bond if available, otherwise show sample data
-  const mockBonds: Bond[] = bond ? [bond] : [sampleBond];
+  // 優先使用 extendedBond 因為它包含最新的價格數據
+  const displayBond = extendedBond || bond;
+  const mockBonds: Bond[] = displayBond ? [displayBond] : [sampleBond];
+  
+  // 匯出 Excel 功能
+  const handleExportExcel = () => {
+    if (!mockBonds || mockBonds.length === 0) {
+      toast.error('沒有資料可以匯出');
+      return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+      // 準備工作表資料
+      const worksheetData = mockBonds.map(bond => ({
+        '債券名稱': bond.name,
+        'ISIN': bond.isin,
+        '發行人': bond.issuer,
+        '幣別': bond.currency,
+        '剩餘年期': bond.remainingYears,
+        '票息(%)': bond.couponRate,
+        'Bid': bond.bidPrice,
+        'YTM (%)': bond.yieldToMaturity,
+        'Ask': bond.askPrice,
+        'S&P評等': bond.spRating,
+        'Moody評等': bond.moodyRating,
+        'Fitch評等': bond.fitchRating,
+        '配息頻率': bond.paymentFrequency,
+        '到期日': bond.maturityDate,
+        '國家': bond.country,
+        '產業': bond.industry,
+        '最小承作金額': bond.minAmount,
+        '最小累加金額': bond.minIncrement,
+        '發行日': bond.issueDate,
+        '下一配息日': bond.nextCouponDate,
+        '前手息': bond.accruedInterest,
+        '投資人身分別': bond.investorType.join(', '),
+        '母公司代碼': bond.parentCompanyCode || '',
+        '一年違約機率': bond.defaultProbability1Y ? `${(bond.defaultProbability1Y * 100).toFixed(4)}%` : '',
+        '發行人描述': bond.issuerDescription || ''
+      }));
+
+      // 創建工作簿
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+      // 設置欄位寬度
+      const columnWidths = [
+        { wch: 30 }, // 債券名稱
+        { wch: 15 }, // ISIN
+        { wch: 20 }, // 發行人
+        { wch: 8 },  // 幣別
+        { wch: 10 }, // 剩餘年期
+        { wch: 10 }, // 票息(%)
+        { wch: 10 }, // Bid
+        { wch: 10 }, // YTM (%)
+        { wch: 10 }, // Ask
+        { wch: 10 }, // S&P評等
+        { wch: 10 }, // Moody評等
+        { wch: 10 }, // Fitch評等
+        { wch: 12 }, // 配息頻率
+        { wch: 12 }, // 到期日
+        { wch: 10 }, // 國家
+        { wch: 15 }, // 產業
+        { wch: 15 }, // 最小承作金額
+        { wch: 15 }, // 最小累加金額
+        { wch: 12 }, // 發行日
+        { wch: 12 }, // 下一配息日
+        { wch: 10 }, // 前手息
+        { wch: 15 }, // 投資人身分別
+        { wch: 12 }, // 母公司代碼
+        { wch: 15 }, // 一年違約機率
+        { wch: 30 }  // 發行人描述
+      ];
+      
+      worksheet['!cols'] = columnWidths;
+
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(workbook, worksheet, '債券查詢結果');
+
+      // 生成檔案名稱
+      const fileName = `債券查詢結果_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      // 下載檔案
+      XLSX.writeFile(workbook, fileName);
+      
+      toast.success(`已匯出 ${mockBonds.length} 筆債券資料到 ${fileName}`);
+      
+    } catch (error) {
+      console.error('匯出 Excel 失敗:', error);
+      toast.error('匯出失敗，請重試');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const [selectedColumns, setSelectedColumns] = useState({
     isin: true,
     name: true,
@@ -156,9 +264,15 @@ const SearchPage = () => {
                 </SheetContent>
               </Sheet>
               
-              <Button variant="outline" size="lg" className="px-6">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="px-6"
+                onClick={handleExportExcel}
+                disabled={isExporting}
+              >
                 <Download className="w-4 h-4 mr-2" />
-                匯出
+                {isExporting ? '匯出中...' : '匯出'}
               </Button>
             </div>
           </CardContent>
@@ -276,8 +390,12 @@ function renderCellValue(bond: Bond, column: string): React.ReactNode {
     case 'spRating':
     case 'moodyRating':
     case 'fitchRating':
-      // Always show "—" for ratings as per requirements
-      return (
+      // 顯示實際的信用評等（現在 API 支援中文版本）
+      return value && value !== '—' ? (
+        <Badge className={getRatingColor(value as string)}>
+          {value as string}
+        </Badge>
+      ) : (
         <Badge className="bg-muted text-muted-foreground text-xs">
           —
         </Badge>
@@ -285,12 +403,12 @@ function renderCellValue(bond: Bond, column: string): React.ReactNode {
     case 'couponRate':
       return `${(value as number).toFixed(2)}%`;
     case 'yieldToMaturity':
-      // Always show "—" for YTM as per requirements
-      return '—';
+      // 顯示實際的到期殖利率（API 返回的是小數格式，如 0.043 = 4.3%）
+      return value && (value as number) > 0 ? `${((value as number) * 100).toFixed(2)}%` : '—';
     case 'bidPrice':
     case 'askPrice':
-      // Always show "—" for prices as per requirements
-      return '—';
+      // 顯示實際的買賣價格
+      return value && (value as number) > 0 ? (value as number).toFixed(2) : '—';
     case 'remainingYears':
       return `${(value as number).toFixed(1)} 年`;
     case 'currency':

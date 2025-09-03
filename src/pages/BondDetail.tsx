@@ -11,6 +11,7 @@ import {
   Shield,
   Building,
   FileSpreadsheet,
+  FileText,
   Star
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -20,18 +21,32 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { sampleBond, type Bond } from '@/types/bond';
 import Header from '@/components/Header';
+import { BondDMModal } from '@/components/bond-dm/BondDMModal';
+import * as XLSX from 'xlsx';
 
 const BondDetail = () => {
   const { isin } = useParams<{ isin: string }>();
   const navigate = useNavigate();
-  const { bond } = useBondSearch();
+  const { bond, extendedBond } = useBondSearch();
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDMModalOpen, setIsDMModalOpen] = useState(false);
 
   if (!isin) return <Navigate to="/search" replace />;
 
-  // Use context bond if ISIN matches, otherwise use sample data
-  const displayBond = bond && bond.isin === isin ? bond : sampleBond;
+  // Use context bond if ISIN matches, otherwise redirect to search
+  // 優先使用 extendedBond 因為它包含最新的價格數據
+  const contextBond = extendedBond || bond;
+  const displayBond = contextBond && contextBond.isin === isin ? contextBond : null;
+  
+  // 調試信息
+  console.log('BondDetail - displayBond:', {
+    isin: displayBond?.isin,
+    industry: displayBond?.industry,
+    emitentInfo: (displayBond as any)?.emitentInfo
+  });
+  
+  // 如果沒有匹配的債券資料，重定向到搜尋頁面
   if (!displayBond) return <Navigate to="/search" replace />;
 
   const handleGenerateCard = async () => {
@@ -83,13 +98,143 @@ const BondDetail = () => {
     }
   };
 
+  // 計算所有配息日期和金額
+  const calculateCouponSchedule = () => {
+    if (!displayBond) return [];
+
+    const investmentAmount = 1000000; // 預設100萬
+    const couponRate = displayBond.couponRate || 0;
+    const annualCoupon = (investmentAmount * couponRate) / 100;
+    
+    const issueDate = new Date(displayBond.issueDate);
+    const maturityDate = new Date(displayBond.maturityDate);
+    const nextCouponDate = new Date(displayBond.nextCouponDate);
+    
+    const couponSchedule = [];
+    
+    // 根據配息頻率計算每次配息金額和間隔
+    let couponAmount = annualCoupon;
+    let monthsInterval = 12; // 預設每年
+    
+    switch (displayBond.paymentFrequency) {
+      case '每半年':
+        couponAmount = annualCoupon / 2; // 每半年配息，每次是年配息的一半
+        monthsInterval = 6;
+        break;
+      case '每季':
+        couponAmount = annualCoupon / 4; // 每季配息，每次是年配息的1/4
+        monthsInterval = 3;
+        break;
+      case '每月':
+        couponAmount = annualCoupon / 12; // 每月配息，每次是年配息的1/12
+        monthsInterval = 1;
+        break;
+      case '每年':
+      default:
+        couponAmount = annualCoupon; // 每年配息
+        monthsInterval = 12;
+        break;
+    }
+    
+    // 從下一個配息日開始計算
+    const currentDate = new Date(nextCouponDate);
+    
+    while (currentDate <= maturityDate) {
+      couponSchedule.push({
+        配息日期: currentDate.toLocaleDateString('zh-TW'),
+        配息金額: couponAmount.toLocaleString('zh-TW', {
+          style: 'currency',
+          currency: displayBond.currency || 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        投資金額: investmentAmount.toLocaleString('zh-TW', {
+          style: 'currency',
+          currency: displayBond.currency || 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }),
+        票息率: `${couponRate}%`,
+        配息頻率: displayBond.paymentFrequency || '每年'
+      });
+      
+      // 根據配息頻率增加時間間隔
+      currentDate.setMonth(currentDate.getMonth() + monthsInterval);
+    }
+    
+    return couponSchedule;
+  };
+
   const handleExportSpreadsheet = async () => {
+    if (!displayBond) {
+      alert('無法匯出：缺少債券資料');
+      return;
+    }
+
     setIsExporting(true);
-    // Mock export delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsExporting(false);
-    // In real app, this would generate and download CSV/XLSX
-    alert('試算表匯出功能開發中...');
+    
+    try {
+      // 計算配息時程表
+      const couponSchedule = calculateCouponSchedule();
+      
+      if (couponSchedule.length === 0) {
+        alert('無法計算配息時程表');
+        return;
+      }
+
+      // 創建工作表數據
+      const worksheetData = [
+        // 標題行
+        ['債券配息時程表'],
+        [''],
+        ['債券名稱', displayBond.name],
+        ['ISIN', displayBond.isin],
+        ['發行日', displayBond.issueDate],
+        ['到期日', displayBond.maturityDate],
+        ['票息率', `${displayBond.couponRate}%`],
+        ['投資金額', `1,000,000 ${displayBond.currency || 'USD'}`],
+        [''],
+        // 配息時程表標題
+        ['配息日期', '配息金額', '投資金額', '票息率', '配息頻率'],
+        // 配息數據
+        ...couponSchedule.map(item => [
+          item.配息日期,
+          item.配息金額,
+          item.投資金額,
+          item.票息率,
+          item.配息頻率
+        ])
+      ];
+
+      // 創建工作簿
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // 設置列寬
+      worksheet['!cols'] = [
+        { wch: 15 }, // 配息日期
+        { wch: 20 }, // 配息金額
+        { wch: 20 }, // 投資金額
+        { wch: 10 }, // 票息率
+        { wch: 12 }  // 配息頻率
+      ];
+      
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(workbook, worksheet, '配息時程表');
+      
+      // 生成文件名
+      const fileName = `${displayBond.name}-配息時程表-${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // 下載文件
+      XLSX.writeFile(workbook, fileName);
+      
+      console.log('Excel 匯出成功！');
+    } catch (error) {
+      console.error('Excel 匯出失敗:', error);
+      alert('匯出失敗，請稍後再試');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const getRatingColor = (rating: string) => {
@@ -174,6 +319,14 @@ const BondDetail = () => {
                         <FileSpreadsheet className="w-4 h-4 mr-2" />
                         {isExporting ? '匯出中...' : '匯出試算表'}
                       </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => setIsDMModalOpen(true)}
+                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        查看DM
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -216,7 +369,7 @@ const BondDetail = () => {
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">YTM</p>
                   <p className="text-2xl font-bold text-success">
-                    {displayBond.yieldToMaturity.toFixed(2)}%
+                    {(displayBond.yieldToMaturity * 100).toFixed(2)}%
                   </p>
                 </div>
                 <div className="text-center">
@@ -351,6 +504,13 @@ const BondDetail = () => {
                 <p className="text-sm text-muted-foreground">一年違約機率</p>
                 <p className="font-medium">{(displayBond.defaultProbability1Y * 100).toFixed(4)}%</p>
               </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">TLAC/MREL:</span>
+                <Badge variant={displayBond.tlacMrel ? "default" : "outline"}>
+                  {displayBond.tlacMrel ? '適用' : '不適用'}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
 
@@ -371,7 +531,9 @@ const BondDetail = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">產業別</p>
-                  <Badge variant="outline">{displayBond.industry}</Badge>
+                  <Badge variant="outline">
+                    {displayBond.industry || (displayBond as any)?.emitentInfo?.branch_name_eng || '—'}
+                  </Badge>
                 </div>
                 {displayBond.parentCompanyCode && (
                   <div>
@@ -396,10 +558,12 @@ const BondDetail = () => {
                 </div>
               </div>
               
-              {displayBond.issuerDescription && (
+              {((displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription) && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">發行者簡介</p>
-                  <p className="text-sm leading-relaxed">{displayBond.issuerDescription}</p>
+                  <p className="text-sm leading-relaxed">
+                    {(displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription}
+                  </p>
                 </div>
               )}
               
@@ -411,13 +575,6 @@ const BondDetail = () => {
                   </div>
                 </div>
               )}
-              
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>TLAC/MREL:</span>
-                <Badge variant={displayBond.tlacMrel ? "default" : "outline"}>
-                  {displayBond.tlacMrel ? '適用' : '不適用'}
-                </Badge>
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -427,6 +584,13 @@ const BondDetail = () => {
           最後更新：{new Date(displayBond.updatedAt).toLocaleString('zh-TW')}
         </div>
       </main>
+
+      {/* DM Modal */}
+      <BondDMModal 
+        bond={displayBond}
+        isOpen={isDMModalOpen}
+        onClose={() => setIsDMModalOpen(false)}
+      />
     </div>
   );
 };

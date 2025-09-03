@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Bond } from '@/types/bond';
-import { getEmissions } from '@/services/cbonds';
+import { Bond, ExtendedBond, TradingData, PaymentFlow, DefaultRisk, OptionData, GuarantorData } from '@/types/bond';
+import { cbondsAPI } from '@/services/cbonds';
 
 interface BondSearchState {
   bond: Bond | null;
+  extendedBond: ExtendedBond | null;
   loading: boolean;
   error: string | null;
   isin: string;
@@ -13,6 +14,7 @@ interface BondSearchContextType extends BondSearchState {
   searchByISIN: (isin: string) => Promise<void>;
   clearResults: () => void;
   setISIN: (isin: string) => void;
+  refreshBondData: (isin: string) => Promise<void>;
 }
 
 const BondSearchContext = createContext<BondSearchContextType | undefined>(undefined);
@@ -69,6 +71,124 @@ function couponFreqText(cuponPeriod: number | string): string {
     case 12: return '每月';
     default: return '不配';
   }
+}
+
+// 格式化債券名稱中的日期格式
+function formatBondNameDate(bondName: string): string {
+  if (!bondName) return bondName;
+  
+  // 匹配日期格式：20aug2030, 20AUG2030, 20Aug2030 等
+  const datePattern = /(\d{1,2})([a-zA-Z]{3})(\d{4})/g;
+  
+  return bondName.replace(datePattern, (match, day, month, year) => {
+    // 月份映射
+    const monthMap: { [key: string]: string } = {
+      'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+      'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+      'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+    };
+    
+    const monthLower = month.toLowerCase();
+    const monthNum = monthMap[monthLower] || month;
+    
+    // 轉換為 MM/DD/YY 格式
+    const dayPadded = day.padStart(2, '0');
+    const yearShort = year.slice(-2);
+    
+    return `${monthNum}/${dayPadded}/${yearShort}`;
+  });
+}
+
+// 從債券名稱中提取股票代碼
+function extractTickerFromName(bondName: string): string {
+  if (!bondName) return '';
+  
+  console.log('extractTickerFromName - 債券名稱:', bondName);
+  
+  // 方案 1: 嘗試從債券名稱開頭提取股票代碼 (如 "AAPL 1.25% 20aug2030")
+  const tickerMatch = bondName.match(/^([A-Z]{2,5})\s/);
+  if (tickerMatch) {
+    console.log('extractTickerFromName - 從名稱模式提取到股票代碼:', tickerMatch[1]);
+    return tickerMatch[1];
+  }
+  
+  // 方案 2: 從公司名稱中提取可能的股票代碼
+  // 提取公司名稱（通常在逗號前）
+  const companyName = bondName.split(',')[0].trim();
+  console.log('extractTickerFromName - 提取的公司名稱:', companyName);
+  
+  // 方案 3: 常見公司的快速映射（只保留最重要的）
+  const commonTickers: { [key: string]: string } = {
+    'Apple': 'AAPL',
+    'Apple Inc': 'AAPL',
+    'Microsoft': 'MSFT',
+    'Google': 'GOOGL',
+    'Alphabet': 'GOOGL',
+    'Amazon': 'AMZN',
+    'Tesla': 'TSLA',
+    'Meta': 'META',
+    'Facebook': 'META',
+    'Netflix': 'NFLX',
+    'NVIDIA': 'NVDA',
+    'Intel': 'INTC',
+    'IBM': 'IBM',
+    'Oracle': 'ORCL',
+    'Cisco': 'CSCO',
+    'Salesforce': 'CRM',
+    'Adobe': 'ADBE',
+    'PayPal': 'PYPL',
+    'Uber': 'UBER',
+    'Airbnb': 'ABNB',
+    'Zoom': 'ZM',
+    'Spotify': 'SPOT',
+    'Twitter': 'TWTR',
+    'Snapchat': 'SNAP',
+    'Pinterest': 'PINS',
+    'Square': 'SQ',
+    'Shopify': 'SHOP',
+    'Disney': 'DIS',
+    'Warner Bros': 'WBD',
+    'Comcast': 'CMCSA',
+    'AT&T': 'T',
+    'Verizon': 'VZ',
+    'T-Mobile': 'TMUS',
+    'Boeing': 'BA',
+    'General Motors': 'GM',
+    'Ford': 'F',
+    'Toyota': 'TM',
+    'Honda': 'HMC',
+    'Sony': 'SNE',
+    'Samsung': 'SSNLF',
+    'LG': 'LPL',
+    'Panasonic': 'PCRFY',
+    'Canon': 'CAJ',
+    'Nintendo': 'NTDOY',
+    'Pfizer': 'PFE',
+    'Johnson & Johnson': 'JNJ',
+    'Procter & Gamble': 'PG',
+    'Coca-Cola': 'KO',
+    'PepsiCo': 'PEP',
+    'McDonald\'s': 'MCD',
+    'Starbucks': 'SBUX',
+    'Nike': 'NKE',
+    'Walmart': 'WMT',
+    'Target': 'TGT',
+    'Home Depot': 'HD',
+    'Costco': 'COST',
+    'FedEx': 'FDX',
+    'UPS': 'UPS'
+  };
+  
+  for (const [company, ticker] of Object.entries(commonTickers)) {
+    if (companyName.includes(company)) {
+      console.log('extractTickerFromName - 從常見公司映射找到股票代碼:', ticker);
+      return ticker;
+    }
+  }
+  
+  // 方案 4: 如果都沒有找到，返回空字符串
+  console.log('extractTickerFromName - 未找到股票代碼');
+  return '';
 }
 
 function computeTenorYears(maturityDate: string): number {
@@ -157,7 +277,149 @@ function calculateDays360US(startDate: Date, endDate: Date): number {
   return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
 }
 
-function mapEmissionToBond(emission: any): Bond {
+// 處理交易資料
+function processTradingData(tradingResponse: any): TradingData[] {
+  if (!tradingResponse?.items) return [];
+  
+  return tradingResponse.items.map((item: any) => {
+    // 根據 API 實際返回的字段名稱進行映射
+    const bidPrice = parseFloat(item.buying_quote || item.bid_price || '0');
+    const askPrice = parseFloat(item.selling_quote || item.ask_price || '0');
+    const lastPrice = parseFloat(item.last_price || '0');
+    
+    // 使用中間價作為 YTM 的參考，或者使用 bid/offer 的平均值
+    const ytmBid = parseFloat(item.ytm_bid || '0');
+    const ytmOffer = parseFloat(item.ytm_offer || '0');
+    let yieldToMaturity = ytmBid > 0 && ytmOffer > 0 ? (ytmBid + ytmOffer) / 2 : 
+                         ytmBid > 0 ? ytmBid : ytmOffer;
+    
+    // 保持原始 API 數據格式，不進行轉換
+    
+    console.log('處理交易數據:', {
+      isin: item.isin_code,
+      buying_quote: item.buying_quote,
+      selling_quote: item.selling_quote,
+      last_price: item.last_price,
+      ytm_bid: item.ytm_bid,
+      ytm_offer: item.ytm_offer,
+      calculated_ytm: yieldToMaturity
+    });
+    
+    return {
+      isin: item.isin_code || '',
+      tradingDate: item.date || item.trading_date || '',
+      bidPrice,
+      askPrice,
+      lastPrice,
+      volume: parseFloat(item.volume || '0'),
+      yieldToMaturity,
+      spread: askPrice - bidPrice,
+      source: item.trading_ground_id || item.source || ''
+    };
+  });
+}
+
+// 處理付息計劃
+function processPaymentFlows(flowResponse: any): PaymentFlow[] {
+  if (!flowResponse?.items) return [];
+  
+  return flowResponse.items.map((item: any) => ({
+    isin: item.isin_code || '',
+    paymentDate: item.payment_date || '',
+    paymentType: item.payment_type || 'Coupon',
+    amount: parseFloat(item.amount || '0'),
+    currency: item.currency || 'USD',
+    accruedDays: parseInt(item.accrued_days || '0'),
+    accruedInterest: parseFloat(item.accrued_interest || '0'),
+    principalAmount: parseFloat(item.principal_amount || '0'),
+    couponRate: parseFloat(item.coupon_rate || '0')
+  }));
+}
+
+// 處理違約風險資料
+function processDefaultRisk(defaultResponse: any): DefaultRisk | null {
+  if (!defaultResponse?.items || defaultResponse.items.length === 0) {
+    console.log('processDefaultRisk - 沒有違約數據，返回 null');
+    return null;
+  }
+  
+  const item = defaultResponse.items[0];
+  console.log('processDefaultRisk - API 返回的違約數據:', {
+    hasDefaultProbability1Y: !!item.default_probability_1y,
+    hasDefaultProbability5Y: !!item.default_probability_5y,
+    hasRecoveryRate: !!item.recovery_rate,
+    hasCreditSpread: !!item.credit_spread,
+    itemKeys: Object.keys(item)
+  });
+  
+  // 檢查是否有預測的違約機率數據
+  const prob1Y = parseFloat(item.default_probability_1y || '0');
+  const prob5Y = parseFloat(item.default_probability_5y || '0');
+  
+  // 如果沒有預測數據，基於信用評等估算（僅作為示例）
+  let estimatedProb1Y = prob1Y;
+  let estimatedProb5Y = prob5Y;
+  
+  if (prob1Y === 0 && prob5Y === 0) {
+    console.log('processDefaultRisk - 沒有預測違約機率數據，使用估算值');
+    // 基於信用評等的粗略估算（實際應用中應該使用更精確的模型）
+    // 這裡使用保守的估算值
+    estimatedProb1Y = 0.001; // 0.1% - 對於高信用評等債券的保守估算
+    estimatedProb5Y = 0.005; // 0.5% - 五年期估算
+  }
+  
+  let riskLevel: 'Low' | 'Medium' | 'High' | 'Very High' = 'Low';
+  if (estimatedProb1Y > 0.05) riskLevel = 'Very High';
+  else if (estimatedProb1Y > 0.02) riskLevel = 'High';
+  else if (estimatedProb1Y > 0.005) riskLevel = 'Medium';
+  
+  return {
+    isin: item.isin_code || '',
+    defaultProbability1Y: estimatedProb1Y,
+    defaultProbability5Y: estimatedProb5Y,
+    recoveryRate: parseFloat(item.recovery_rate || '0.4'), // 默認 40% 回收率
+    creditSpread: parseFloat(item.credit_spread || '0'),
+    lastUpdated: item.last_updated || new Date().toISOString(),
+    riskLevel
+  };
+}
+
+// 處理期權資料
+function processOptionData(optionResponse: any): OptionData | null {
+  if (!optionResponse?.items || optionResponse.items.length === 0) return null;
+  
+  const item = optionResponse.items[0];
+  return {
+    isin: item.isin_code || '',
+    optionType: item.option_type || 'Both',
+    callDate: item.call_date || undefined,
+    putDate: item.put_date || undefined,
+    callPrice: parseFloat(item.call_price || '0') || undefined,
+    putPrice: parseFloat(item.put_price || '0') || undefined,
+    callNoticeDays: parseInt(item.call_notice_days || '0') || undefined,
+    putNoticeDays: parseInt(item.put_notice_days || '0') || undefined,
+    isCallable: item.is_callable === true || item.is_callable === 'true',
+    isPutable: item.is_putable === true || item.is_putable === 'true'
+  };
+}
+
+// 處理擔保人資料
+function processGuarantorData(guarantorResponse: any): GuarantorData[] {
+  if (!guarantorResponse?.items) return [];
+  
+  return guarantorResponse.items.map((item: any) => ({
+    isin: item.isin_code || '',
+    guarantorName: item.guarantor_name || '',
+    guarantorType: item.guarantor_type || 'Corporate',
+    guaranteeAmount: parseFloat(item.guarantee_amount || '0'),
+    guaranteeCurrency: item.guarantee_currency || 'USD',
+    guaranteePercentage: parseFloat(item.guarantee_percentage || '0'),
+    creditRating: item.credit_rating || '',
+    country: item.country || ''
+  }));
+}
+
+function mapEmissionToBond(emission: any, emitentInfo?: any): Bond {
   const schedule = computeSchedule(emission);
   const accruedInterest = computeACI(emission, schedule);
   const tenorYears = computeTenorYears(emission.maturity_date);
@@ -166,29 +428,35 @@ function mapEmissionToBond(emission: any): Bond {
   return {
     id: emission.isin_code || '1',
     isin: emission.isin_code || '',
-    name: emission.document_eng || emission.bbgid_ticker || '',
-    issuer: emission.emitent_full_name_eng || emission.emitent_name_eng || '',
-    industry: '', // Not provided by API
+    name: formatBondNameDate(emission.document_eng || emission.bbgid_ticker || ''),
+    issuer: emission.emitent_full_name_zh || emission.emitent_name_zh || emission.emitent_full_name_eng || emission.emitent_name_eng || '',
+    industry: emitentInfo?.branch_name_zh || emitentInfo?.branch_name_eng || '', // 從發行人 API 獲取產業別（優先中文）
     currency: emission.currency_name as any || 'USD',
     investorType: ['一般', '專業', '機構'],
-    country: emission.emitent_country_name_eng || '',
+    country: emission.emitent_country_name_zh || emission.emitent_country_name_eng || '',
     remainingYears: tenorYears,
     issueDate: emission.settlement_date || '',
     maturityDate: emission.maturity_date || '',
     maturityType: '到期償還',
     couponRate: parseFloat(emission.emission_coupon_rate || emission.curr_coupon_rate || '0'),
-    couponType: emission.coupon_type_name_eng === 'Fixed' ? '固定' : 
-                 emission.coupon_type_name_eng === 'Floating' ? '浮動' : '其他',
+    couponType: (() => {
+      console.log('API coupon_type_name_eng:', emission.coupon_type_name_eng);
+      if (emission.coupon_type_name_eng === 'Fixed') return '固定';
+      if (emission.coupon_type_name_eng === 'Floating') return '浮動';
+      if (emission.coupon_type_name_eng === 'Zero') return '零息';
+      if (emission.coupon_type_name_eng === 'Step') return '階梯';
+      return '其他';
+    })(),
     paymentFrequency: couponFreqText(emission.cupon_period) as any,
     previousCouponDate: schedule.previousCouponDate,
     nextCouponDate: schedule.nextCouponDate,
     accruedInterest,
-    bidPrice: 0, // Fixed as null - display "—"
-    askPrice: 0, // Fixed as null - display "—"
-    yieldToMaturity: 0, // Fixed as null - display "—"
-    spRating: '—', // Fixed as null - display "—"
-    moodyRating: '—', // Fixed as null - display "—"
-    fitchRating: '—', // Fixed as null - display "—"
+    bidPrice: 0, // 將在 createExtendedBond 中從交易數據更新
+    askPrice: 0, // 將在 createExtendedBond 中從交易數據更新
+    yieldToMaturity: 0, // 將在 createExtendedBond 中從交易數據更新
+    spRating: emission.sp_rating_zh || emission.sp_rating_eng || '—', // 信用評等（優先中文）
+    moodyRating: emission.moody_rating_zh || emission.moody_rating_eng || '—', // 信用評等（優先中文）
+    fitchRating: emission.fitch_rating_zh || emission.fitch_rating_eng || '—', // 信用評等（優先中文）
     minDenomination: parseFloat(emission.integral_multiple || '10000'),
     minIncrement: parseFloat(emission.integral_multiple || '1000'),
     outstandingAmount: parseFloat(emission.outstanding_volume || emission.remaining_outstand_amount || '0'),
@@ -198,7 +466,12 @@ function mapEmissionToBond(emission: any): Bond {
     riskNotes: '',
     defaultProbability1Y: 0,
     tlacMrel: false,
-    parentCompanyCode: '',
+    parentCompanyCode: (() => {
+      const bondName = emission.name_eng || emission.name || '';
+      const ticker = extractTickerFromName(bondName);
+      console.log('mapEmissionToBond - 債券名稱:', bondName, '提取的股票代碼:', ticker);
+      return ticker;
+    })(),
     issuerDescription: '',
     issuerControl: '',
     createdAt: new Date().toISOString(),
@@ -206,9 +479,75 @@ function mapEmissionToBond(emission: any): Bond {
   };
 }
 
+// 創建擴展債券資料
+function createExtendedBond(
+  baseBond: Bond,
+  tradingData: TradingData[],
+  paymentFlows: PaymentFlow[],
+  defaultRisk: DefaultRisk | null,
+  optionData: OptionData | null,
+  guarantors: GuarantorData[],
+  emitentInfo?: any
+): ExtendedBond {
+  // 使用最新的交易資料更新價格資訊
+  const latestTrading = tradingData.length > 0 ? tradingData[0] : null;
+  
+  // 從交易數據中提取最新的價格和收益率
+  let updatedBond = { ...baseBond };
+  
+  if (latestTrading) {
+    // 使用交易數據中的實際價格
+    updatedBond = {
+      ...baseBond,
+      bidPrice: latestTrading.bidPrice || 0,
+      askPrice: latestTrading.askPrice || 0,
+      yieldToMaturity: latestTrading.yieldToMaturity || 0
+    };
+    
+    console.log('更新債券價格數據:', {
+      bidPrice: latestTrading.bidPrice,
+      askPrice: latestTrading.askPrice,
+      yieldToMaturity: latestTrading.yieldToMaturity,
+      lastPrice: latestTrading.lastPrice
+    });
+  } else {
+    console.log('沒有交易數據，使用預設值');
+  }
+
+  // 使用違約風險資料更新風險資訊
+  const riskUpdatedBond = defaultRisk ? {
+    ...updatedBond,
+    defaultProbability1Y: defaultRisk.defaultProbability1Y
+  } : updatedBond;
+
+  return {
+    ...riskUpdatedBond,
+    tradingData,
+    latestTrading,
+    paymentFlows,
+    nextPayments: paymentFlows.filter(flow => 
+      new Date(flow.paymentDate) > new Date()
+    ).slice(0, 5), // 未來5次付息
+    defaultRisk,
+    optionData,
+    guarantors,
+    emitentInfo,
+    dataStatus: {
+      emissions: 'loaded',
+      tradings: tradingData.length > 0 ? 'loaded' : 'error',
+      flows: paymentFlows.length > 0 ? 'loaded' : 'error',
+      defaults: defaultRisk ? 'loaded' : 'error',
+      options: optionData ? 'loaded' : 'error',
+      guarantors: guarantors.length > 0 ? 'loaded' : 'error'
+    },
+    lastDataUpdate: new Date().toISOString()
+  };
+}
+
 export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<BondSearchState>({
     bond: null,
+    extendedBond: null,
     loading: false,
     error: null,
     isin: ''
@@ -229,26 +568,95 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
     }));
 
     try {
-      const response = await getEmissions(isin);
-      
-      if (!response.items || response.items.length === 0) {
+      // 並行調用所有 API 端點（使用中文版本）
+      const [emissionsResponse, tradingsResponse, flowsResponse, defaultsResponse, optionsResponse, guarantorsResponse] = await Promise.allSettled([
+        (cbondsAPI as any).getEmissions(isin, 'cht'),
+        cbondsAPI.getTradingsNew(isin),
+        cbondsAPI.getFlowNew(isin),
+        cbondsAPI.getEmissionDefault(isin),
+        cbondsAPI.getOffert(isin),
+        cbondsAPI.getEmissionGuarantors(isin)
+      ]);
+
+      // 獲取發行人詳細信息（中文版本）
+      let emitentInfo = null;
+      if (emissionsResponse.status === 'fulfilled' && emissionsResponse.value?.items?.[0]?.emitent_id) {
+        try {
+          const emitentResponse = await cbondsAPI.getEmitents(emissionsResponse.value.items[0].emitent_id, 'cht');
+          if (emitentResponse?.items?.[0]) {
+            emitentInfo = emitentResponse.items[0];
+            console.log('發行人信息（中文）:', emitentInfo);
+            console.log('發行人信息字段:', Object.keys(emitentInfo));
+            console.log('profile_zh:', emitentInfo.profile_zh);
+            console.log('profile_eng:', emitentInfo.profile_eng);
+          }
+        } catch (error) {
+          console.warn('獲取發行人信息失敗:', error);
+        }
+      }
+
+      // 處理發行資料（必需）
+      if (emissionsResponse.status === 'rejected' || !emissionsResponse.value?.items || emissionsResponse.value.items.length === 0) {
         const errorMsg = '查無此 ISIN 代碼的債券資料';
         setState(prev => ({ 
           ...prev, 
           loading: false, 
           error: errorMsg,
-          bond: null
+          bond: null,
+          extendedBond: null
         }));
         throw new Error(errorMsg);
       }
 
-      const emission = response.items[0];
-      const bond = mapEmissionToBond(emission);
+      const emission = emissionsResponse.value.items[0];
+      const baseBond = mapEmissionToBond(emission, emitentInfo);
+
+      // 處理其他 API 回應（可選）
+      console.log('交易數據 API 回應:', tradingsResponse);
+      const tradingData = tradingsResponse.status === 'fulfilled' ? 
+        processTradingData(tradingsResponse.value) : [];
+      console.log('處理後的交易數據:', tradingData);
+      
+      const paymentFlows = flowsResponse.status === 'fulfilled' ? 
+        processPaymentFlows(flowsResponse.value) : [];
+      
+      const defaultRisk = defaultsResponse.status === 'fulfilled' ? 
+        processDefaultRisk(defaultsResponse.value) : null;
+      
+      const optionData = optionsResponse.status === 'fulfilled' ? 
+        processOptionData(optionsResponse.value) : null;
+      
+      const guarantors = guarantorsResponse.status === 'fulfilled' ? 
+        processGuarantorData(guarantorsResponse.value) : [];
+
+      // 創建擴展債券資料
+      console.log('創建擴展債券前的數據:', {
+        baseBond: { bidPrice: baseBond.bidPrice, askPrice: baseBond.askPrice, yieldToMaturity: baseBond.yieldToMaturity },
+        tradingDataLength: tradingData.length,
+        tradingData: tradingData
+      });
+      
+      const extendedBond = createExtendedBond(
+        baseBond,
+        tradingData,
+        paymentFlows,
+        defaultRisk,
+        optionData,
+        guarantors,
+        emitentInfo
+      );
+      
+      console.log('創建擴展債券後的數據:', {
+        bidPrice: extendedBond.bidPrice,
+        askPrice: extendedBond.askPrice,
+        yieldToMaturity: extendedBond.yieldToMaturity
+      });
 
       setState(prev => ({ 
         ...prev, 
         loading: false, 
-        bond,
+        bond: baseBond,
+        extendedBond,
         error: null
       }));
     } catch (error) {
@@ -256,15 +664,65 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
       setState(prev => ({ 
         ...prev, 
         loading: false, 
-        error: errorMsg
+        error: errorMsg,
+        bond: null,
+        extendedBond: null
       }));
       throw error; // Re-throw so caller knows it failed
+    }
+  };
+
+  const refreshBondData = async (isin: string) => {
+    // 重新整理資料，只更新非發行資料
+    if (!state.extendedBond) return;
+
+    try {
+      const [tradingsResponse, flowsResponse, defaultsResponse, optionsResponse, guarantorsResponse] = await Promise.allSettled([
+        cbondsAPI.getTradingsNew(isin),
+        cbondsAPI.getFlowNew(isin),
+        cbondsAPI.getEmissionDefault(isin),
+        cbondsAPI.getOffert(isin),
+        cbondsAPI.getEmissionGuarantors(isin)
+      ]);
+
+      const tradingData = tradingsResponse.status === 'fulfilled' ? 
+        processTradingData(tradingsResponse.value) : state.extendedBond.tradingData || [];
+      
+      const paymentFlows = flowsResponse.status === 'fulfilled' ? 
+        processPaymentFlows(flowsResponse.value) : state.extendedBond.paymentFlows || [];
+      
+      const defaultRisk = defaultsResponse.status === 'fulfilled' ? 
+        processDefaultRisk(defaultsResponse.value) : state.extendedBond.defaultRisk;
+      
+      const optionData = optionsResponse.status === 'fulfilled' ? 
+        processOptionData(optionsResponse.value) : state.extendedBond.optionData;
+      
+      const guarantors = guarantorsResponse.status === 'fulfilled' ? 
+        processGuarantorData(guarantorsResponse.value) : state.extendedBond.guarantors || [];
+
+      // 更新擴展債券資料
+      const updatedExtendedBond = createExtendedBond(
+        state.bond!,
+        tradingData,
+        paymentFlows,
+        defaultRisk,
+        optionData,
+        guarantors
+      );
+
+      setState(prev => ({ 
+        ...prev, 
+        extendedBond: updatedExtendedBond
+      }));
+    } catch (error) {
+      console.error('重新整理債券資料失敗:', error);
     }
   };
 
   const clearResults = () => {
     setState({
       bond: null,
+      extendedBond: null,
       loading: false,
       error: null,
       isin: ''
@@ -281,7 +739,8 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
         ...state,
         searchByISIN,
         clearResults,
-        setISIN
+        setISIN,
+        refreshBondData
       }}
     >
       {children}

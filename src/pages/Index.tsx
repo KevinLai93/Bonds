@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import Header from '@/components/Header';
 import EUFLogo from '@/components/EUFLogo';
 
@@ -26,7 +27,8 @@ const Index = () => {
         console.error('Search failed:', err);
       }
     } else {
-      navigate('/search');
+      // 沒有輸入ISIN時顯示錯誤提示，不導航到搜尋頁面
+      toast.error('請輸入 ISIN 代碼');
     }
   };
 
@@ -69,7 +71,7 @@ const Index = () => {
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
                   <Input
-                    placeholder="輸入 ISIN 代碼或關鍵字，例如 US037833DY36"
+                    placeholder="輸入完整ISIN代碼查詢債券資料，如US037833DY36"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-12 h-14 text-lg"
@@ -165,40 +167,42 @@ const Index = () => {
           </Card>
         </div>
 
-        {/* Sample Data Preview */}
-        <Card className="shadow-financial">
-          <CardHeader>
-            <CardTitle className="text-center">範例債券資訊</CardTitle>
-            <p className="text-center text-muted-foreground">
-              內建範例資料：Apple Inc. 債券
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-gradient-card p-6 rounded-lg border">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-                <div>
-                  <p className="text-sm text-muted-foreground">債券名稱</p>
-                  <p className="font-bold">AAPL 1 1/4 08/20/30</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">ISIN</p>
-                  <p className="font-bold">US037833DY36</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">YTM</p>
-                  <p className="font-bold text-success">3.74%</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">評等</p>
-                  <div className="flex justify-center gap-1">
-                    <Badge className="bg-primary text-primary-foreground text-xs">AA+</Badge>
-                    <Badge className="bg-success text-success-foreground text-xs">Aaa</Badge>
+        {/* Sample Data Preview - Hidden */}
+        {false && (
+          <Card className="shadow-financial">
+            <CardHeader>
+              <CardTitle className="text-center">範例債券資訊</CardTitle>
+              <p className="text-center text-muted-foreground">
+                內建範例資料：Apple Inc. 債券
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gradient-card p-6 rounded-lg border">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-muted-foreground">債券名稱</p>
+                    <p className="font-bold">AAPL 1 1/4 08/20/30</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">ISIN</p>
+                    <p className="font-bold">US037833DY36</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">YTM</p>
+                    <p className="font-bold text-success">3.74%</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">評等</p>
+                    <div className="flex justify-center gap-1">
+                      <Badge className="bg-primary text-primary-foreground text-xs">AA+</Badge>
+                      <Badge className="bg-success text-success-foreground text-xs">Aaa</Badge>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

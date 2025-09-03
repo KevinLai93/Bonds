@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // 開發環境預設使用 HTTP，生產環境可配置 HTTPS
     // 移除直接代理，讓 API 請求正確路由到我們的 Vercel 函數
   },
   plugins: [

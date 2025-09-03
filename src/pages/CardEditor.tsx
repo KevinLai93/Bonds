@@ -20,13 +20,14 @@ import { toast } from 'sonner';
 import { sampleBond, type Bond } from '@/types/bond';
 import { ProfessionalBondCard } from '@/components/ProfessionalBondCard';
 import { useBondSearch } from '@/contexts/BondSearchContext';
+import { BondDMModal } from '@/components/bond-dm/BondDMModal';
 
 // === A4 常數（輸出像素） ===
 export const PX_A4_300 = { w: 2480, h: 3508 }; // 210/25.4*300, 297/25.4*300
 export const PX_A4_150 = { w: 1240, h: 1754 }; // 210/25.4*150, 297/25.4*150
 
 // === 債券資料查詢（優先使用 API 結果，否則使用樣本資料） ===
-const getBondByIsin = (isin: string, searchedBond: Bond | null): Bond | null => {
+const getBondByIsin = (isin: string, searchedBond: Bond | ExtendedBond | null): Bond | ExtendedBond | null => {
   // 如果搜尋結果的 ISIN 匹配，使用 API 資料
   if (searchedBond && searchedBond.isin === isin) {
     return searchedBond;
@@ -103,7 +104,7 @@ interface ThemeConfig {
 
 const CardEditor = () => {
   const { isin } = useParams<{ isin: string }>();
-  const { bond: searchedBond, searchByISIN } = useBondSearch();
+  const { bond: searchedBond, extendedBond, searchByISIN } = useBondSearch();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
@@ -112,17 +113,26 @@ const CardEditor = () => {
 
   // 預覽狀態與參考
   const [showPreview, setShowPreview] = useState(false);
+  const [showDM, setShowDM] = useState(false);
   const previewViewportRef = useRef<HTMLDivElement>(null);
   const previewA4Ref = useRef<HTMLDivElement>(null);
 
   // 匯出方向 / 單頁設定（沿用你原本）
   const [orientation] = useState<'portrait' | 'landscape'>('portrait');
   const [strictSinglePage] = useState(true);
+  
+  // 追蹤是否已經初始化過
+  const [isInitialized, setIsInitialized] = useState(false);
 
   if (!isin) return <Navigate to="/search" replace />;
   
-  // 嘗試取得債券資料
-  const bond = getBondByIsin(isin, searchedBond);
+  // 嘗試取得債券資料，優先使用 extendedBond（包含價格數據）
+  const bond = getBondByIsin(isin, extendedBond || searchedBond);
+  
+  // 調試信息
+  console.log('CardEditor - extendedBond:', extendedBond);
+  console.log('CardEditor - searchedBond:', searchedBond);
+  console.log('CardEditor - final bond:', bond);
   
   // 如果沒有找到債券資料，嘗試搜尋
   useEffect(() => {
@@ -130,6 +140,66 @@ const CardEditor = () => {
       searchByISIN(isin);
     }
   }, [bond, isin, searchedBond?.isin, searchByISIN]);
+
+  // 當 extendedBond 數據加載完成後，重新初始化 cardData
+  useEffect(() => {
+    console.log('CardEditor - useEffect 觸發:', {
+      hasExtendedBond: !!extendedBond,
+      extendedBondIsin: extendedBond?.isin,
+      currentIsin: isin,
+      isInitialized: isInitialized,
+      yieldToMaturity: extendedBond?.yieldToMaturity
+    });
+    
+    if (extendedBond && extendedBond.isin === isin && !isInitialized) {
+      console.log('CardEditor - extendedBond 數據已加載，重新初始化 cardData');
+      
+      // 計算 YTM - 直接乘以 100 並四捨五入到小數點第二位
+      let ytmValue = '';
+      if (extendedBond.yieldToMaturity && extendedBond.yieldToMaturity > 0) {
+        let finalYtm = extendedBond.yieldToMaturity * 100; // 直接乘以 100
+        finalYtm = Math.round(finalYtm * 100) / 100; // 四捨五入到小數點第二位
+        ytmValue = finalYtm.toString();
+        console.log('CardEditor - YTM 計算:', {
+          original: extendedBond.yieldToMaturity,
+          multiplied: extendedBond.yieldToMaturity * 100,
+          final: finalYtm,
+          ytmValue: ytmValue
+        });
+      } else {
+        console.log('CardEditor - YTM 條件不滿足:', {
+          yieldToMaturity: extendedBond.yieldToMaturity,
+          isPositive: extendedBond.yieldToMaturity > 0
+        });
+      }
+      
+      // 計算票息類型
+      const couponType = extendedBond.couponType || '固定';
+      
+      console.log('CardEditor - 準備更新 cardData:', {
+        ytm: ytmValue,
+        couponType: couponType,
+        bidPrice: extendedBond.bidPrice,
+        askPrice: extendedBond.askPrice
+      });
+      
+      setCardData(prev => {
+        const newData = {
+          ...prev,
+          ytm: ytmValue,
+          couponType: couponType,
+          bidPrice: extendedBond.bidPrice && extendedBond.bidPrice > 0 ? extendedBond.bidPrice.toString() : prev.bidPrice,
+          askPrice: extendedBond.askPrice && extendedBond.askPrice > 0 ? extendedBond.askPrice.toString() : prev.askPrice,
+          tradingPrice: extendedBond.bidPrice && extendedBond.bidPrice > 0 ? extendedBond.bidPrice.toString() : prev.tradingPrice,
+        };
+        
+        console.log('CardEditor - 更新後的 cardData:', newData);
+        return newData;
+      });
+      
+      setIsInitialized(true);
+    }
+  }, [extendedBond, isin]);
   
   // 如果沒有債券資料且不是載入中，返回搜尋頁面
   if (!bond && searchedBond?.isin !== isin) {
@@ -148,22 +218,22 @@ const CardEditor = () => {
         currency: bond.currency || '',
         investorType: ['一般'],
         couponRate: bond.couponRate?.toString() || '',
-        couponType: bond.couponType || '固定',
+        couponType: bond?.couponType || '固定',
         minAmount: bond.minDenomination?.toString() || '',
-        minIncrement: '10000',
+        minIncrement: bond.minIncrement?.toString() || '10000',
         accruedInterest: bond.accruedInterest?.toString() || '',
         issueDate: bond.issueDate || '',
         maturityDate: bond.maturityDate || '',
         lastCouponDate: bond.previousCouponDate || '',
         nextCouponDate: bond.nextCouponDate || '',
         nextCallDate: '',
-        bidPrice: bond.bidPrice?.toString() || '',
-        ytm: bond.yieldToMaturity?.toString() || '',
-        askPrice: bond.askPrice?.toString() || '',
-        tradingPrice: bond.bidPrice?.toString() || '',
+        bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
+        ytm: '',
+        askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
+        tradingPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
         quantity: '30000.00',
-        transactionAmount: '',
-        totalSettlement: '',
+        transactionAmount: '1000000.00',
+        totalSettlement: '1000000.00',
         remainingYears: bond.remainingYears?.toString() || '',
         spRating: bond.spRating || '',
         moodyRating: bond.moodyRating || '',
@@ -246,7 +316,7 @@ const CardEditor = () => {
         lastCouponDate: bond.previousCouponDate || prev.lastCouponDate,
         nextCouponDate: bond.nextCouponDate || prev.nextCouponDate,
         bidPrice: bond.bidPrice?.toString() || prev.bidPrice,
-        ytm: bond.yieldToMaturity?.toString() || prev.ytm,
+        // ytm 由專門的 useEffect 處理，這裡不設置
         askPrice: bond.askPrice?.toString() || prev.askPrice,
         tradingPrice: bond.bidPrice?.toString() || prev.tradingPrice,
         remainingYears: bond.remainingYears?.toString() || prev.remainingYears,
@@ -284,8 +354,98 @@ const CardEditor = () => {
     }
   });
 
+  // 監控 cardData 的變化
+  useEffect(() => {
+    console.log('CardEditor - cardData 已更新:', {
+      ytm: cardData.ytm,
+      couponType: cardData.couponType,
+      bidPrice: cardData.bidPrice,
+      askPrice: cardData.askPrice
+    });
+  }, [cardData.ytm, cardData.couponType, cardData.bidPrice, cardData.askPrice]);
+
+  // 驗證交易金額
+  const validateTransactionAmount = useCallback((amount: number, minAmount: number, minIncrement: number) => {
+    const errors: string[] = [];
+    
+    // 檢查是否小於最小承作金額
+    if (amount < minAmount) {
+      errors.push(`交易金額 ${amount.toLocaleString()} 小於最小承作金額 ${minAmount.toLocaleString()}`);
+    }
+    
+    // 檢查是否無法被最小累加金額整除
+    if (amount % minIncrement !== 0) {
+      errors.push(`最小疊加金額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
+    }
+    
+    return errors;
+  }, []);
+
   const handleInputChange = useCallback((field: keyof EditableCardData, value: string | string[] | boolean) => {
-    setCardData(prev => ({ ...prev, [field]: value as any }));
+    setCardData(prev => {
+      const newData = { ...prev, [field]: value as any };
+      
+      // 當參考價格或數量改變時，自動計算交易金額
+      if (field === 'tradingPrice' || field === 'quantity') {
+        const price = parseFloat(field === 'tradingPrice' ? value as string : prev.tradingPrice);
+        const qty = parseFloat(field === 'quantity' ? value as string : prev.quantity);
+        
+        if (!isNaN(price) && !isNaN(qty) && price > 0 && qty > 0) {
+          const transactionAmount = (price * qty).toFixed(2);
+          newData.transactionAmount = transactionAmount;
+          newData.totalSettlement = transactionAmount; // 總交割金額暫時等於交易金額
+          
+          // 驗證交易金額
+          const amount = parseFloat(transactionAmount);
+          const minAmount = parseFloat(prev.minAmount) || 0;
+          const minIncrement = parseFloat(prev.minIncrement) || 1;
+          
+          if (amount > 0 && minAmount > 0 && minIncrement > 0) {
+            const errors = validateTransactionAmount(amount, minAmount, minIncrement);
+            if (errors.length > 0) {
+              errors.forEach(error => toast.warning(error));
+            }
+          }
+        }
+      }
+      
+      // 當交易金額改變時，反向計算數量
+      if (field === 'transactionAmount') {
+        const price = parseFloat(prev.tradingPrice);
+        const transactionAmount = parseFloat(value as string);
+        
+        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
+          const calculatedQuantity = (transactionAmount / price).toFixed(2);
+          newData.quantity = calculatedQuantity;
+          newData.totalSettlement = transactionAmount.toFixed(2); // 總交割金額等於交易金額
+          
+          // 驗證交易金額
+          const minAmount = parseFloat(prev.minAmount) || 0;
+          const minIncrement = parseFloat(prev.minIncrement) || 1;
+          
+          if (minAmount > 0 && minIncrement > 0) {
+            const errors = validateTransactionAmount(transactionAmount, minAmount, minIncrement);
+            if (errors.length > 0) {
+              errors.forEach(error => toast.warning(error));
+            }
+          }
+        }
+      }
+      
+      return newData;
+    });
+  }, [validateTransactionAmount]);
+
+  // 專門處理 YTM 輸入，確保輸入的是百分比值
+  const handleYTMChange = useCallback((value: string) => {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      // 直接使用輸入值，因為我們已經在 useEffect 中處理了轉換
+      const formattedValue = Math.round(numValue * 100) / 100; // 四捨五入到小數點第二位
+      setCardData(prev => ({ ...prev, ytm: formattedValue.toString() }));
+    } else {
+      setCardData(prev => ({ ...prev, ytm: value }));
+    }
   }, []);
 
   // ===== 顏色處理（沿用你原本） =====
@@ -821,47 +981,56 @@ return (
         </Link>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="flex items-center space-x-2">
-            <Eye className="w-4 h-4" />
-            <span>預覽</span>
+          {false && (
+            <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="flex items-center space-x-2">
+              <Eye className="w-4 h-4" />
+              <span>預覽</span>
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" onClick={() => setShowDM(true)} className="flex items-center space-x-2">
+            <FileText className="w-4 h-4" />
+            <span>查看DM</span>
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                disabled={isExporting}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {isExporting ? '匯出中...' : '匯出'}
-                <ChevronDown className="w-4 h-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem 
-                onClick={() => downloadPNG(300)}
-                disabled={isExporting}
-              >
-                <FileImage className="w-4 h-4 mr-2" />
-                PNG 300DPI (A4)
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => downloadPNG(150)}
-                disabled={isExporting}
-              >
-                <FileImage className="w-4 h-4 mr-2" />
-                PNG 150DPI (A4)
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={downloadPDF}
-                disabled={isExporting}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                PDF A4
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {false && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  disabled={isExporting}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {isExporting ? '匯出中...' : '匯出'}
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem 
+                  onClick={() => downloadPNG(300)}
+                  disabled={isExporting}
+                >
+                  <FileImage className="w-4 h-4 mr-2" />
+                  PNG 300DPI (A4)
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => downloadPNG(150)}
+                  disabled={isExporting}
+                >
+                  <FileImage className="w-4 h-4 mr-2" />
+                  PNG 150DPI (A4)
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={downloadPDF}
+                  disabled={isExporting}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF A4
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </header>
@@ -875,8 +1044,8 @@ return (
 
       <div className="max-w-4xl mx-auto">
         <div className="space-y-4">
-          {/* 報告標題 / 品牌樣式 */}
-          <Card className="shadow-card">
+          {/* 報告標題 / 品牌樣式 - 已隱藏 */}
+          {false && <Card className="shadow-card">
             <div className={`p-1 rounded-t-lg transition-colors ${openAccordions.includes('header') ? 'bg-brand-600' : ''}`}>
               <div className="flex items-center p-3">
                 <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleAccordion('header')}>
@@ -979,7 +1148,7 @@ return (
                 </div>
               </CardContent>
             )}
-          </Card>
+          </Card>}
 
           {/* 債券基本資訊 */}
           <Card className="shadow-card">
@@ -1044,6 +1213,7 @@ return (
                         <SelectItem value="浮動">浮動</SelectItem>
                         <SelectItem value="零息">零息</SelectItem>
                         <SelectItem value="階梯">階梯</SelectItem>
+                        <SelectItem value="其他">其他</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1147,7 +1317,7 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="ytm">到期殖利率 (%)</Label>
-                    <Input id="ytm" type="number" step="0.01" value={cardData.ytm} onChange={(e) => handleInputChange('ytm', e.target.value)} />
+                    <Input id="ytm" type="number" step="0.01" value={cardData.ytm} onChange={(e) => handleYTMChange(e.target.value)} />
                   </div>
                 </div>
 
@@ -1164,12 +1334,57 @@ return (
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="transactionAmount">交易金額</Label>
-                    <Input id="transactionAmount" type="number" step="0.01" value={cardData.transactionAmount} onChange={(e) => handleInputChange('transactionAmount', e.target.value)} />
+                    <Label htmlFor="transactionAmount" className="flex items-center gap-1">
+                      交易金額
+                      {(() => {
+                        const amount = parseFloat(cardData.transactionAmount) || 0;
+                        const minAmount = parseFloat(cardData.minAmount) || 0;
+                        const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                        const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
+                          (amount < minAmount || amount % minIncrement !== 0);
+                        return hasError ? <AlertCircle className="w-4 h-4 text-destructive" /> : null;
+                      })()}
+                    </Label>
+                    <Input 
+                      id="transactionAmount" 
+                      type="number" 
+                      step="0.01" 
+                      value={cardData.transactionAmount} 
+                      onChange={(e) => handleInputChange('transactionAmount', e.target.value)}
+                      className={(() => {
+                        const amount = parseFloat(cardData.transactionAmount) || 0;
+                        const minAmount = parseFloat(cardData.minAmount) || 0;
+                        const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                        const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
+                          (amount < minAmount || amount % minIncrement !== 0);
+                        return hasError ? 'border-destructive' : '';
+                      })()}
+                    />
+                    {(() => {
+                      const amount = parseFloat(cardData.transactionAmount) || 0;
+                      const minAmount = parseFloat(cardData.minAmount) || 0;
+                      const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                      const errors: string[] = [];
+                      
+                      if (amount > 0 && minAmount > 0 && amount < minAmount) {
+                        errors.push(`小於最小承作金額 ${minAmount.toLocaleString()}`);
+                      }
+                      if (amount > 0 && minIncrement > 0 && amount % minIncrement !== 0) {
+                        errors.push(`最小疊加金額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
+                      }
+                      
+                      return errors.length > 0 ? (
+                        <div className="text-xs text-destructive mt-1">
+                          {errors.map((error, index) => (
+                            <div key={index}>{error}</div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   <div>
                     <Label htmlFor="totalSettlement">總交割金額</Label>
-                    <Input id="totalSettlement" type="number" step="0.01" value={cardData.totalSettlement} onChange={(e) => handleInputChange('totalSettlement', e.target.value)} />
+                    <Input id="totalSettlement" type="number" step="0.01" value={cardData.totalSettlement} readOnly className="bg-gray-50" />
                   </div>
                 </div>
               </CardContent>
@@ -1314,8 +1529,39 @@ return (
       <PreviewContent />
     </div>
   </DialogContent>
-</Dialog>
+  </Dialog>
 
+  {/* DM Modal */}
+  <BondDMModal 
+    bond={{
+      ...bond,
+      spRating: cardData.spRating,
+      moodyRating: cardData.moodyRating,
+      fitchRating: cardData.fitchRating,
+      couponRate: cardData.couponRate,
+      yieldToMaturity: parseFloat(cardData.ytm) || 0,
+      bidPrice: parseFloat(cardData.bidPrice) || 0,
+      askPrice: parseFloat(cardData.askPrice) || 0,
+      tradingPrice: parseFloat(cardData.tradingPrice) || 0,
+      remainingYears: parseFloat(cardData.remainingYears) || 0,
+      minAmount: parseFloat(cardData.minAmount) || 0,
+      minIncrement: parseFloat(cardData.minIncrement) || 0,
+      issuer: cardData.issuer,
+      country: cardData.country,
+      industry: cardData.industry,
+      paymentFrequency: cardData.paymentFrequency,
+      maturityType: cardData.maturityType,
+      seniority_text: cardData.seniorityRank,
+      issuerDescription: cardData.issuerDescription,
+      issuerControl: cardData.issuerControl,
+      riskNotes: cardData.riskNotes,
+      defaultProbability1Y: parseFloat(cardData.defaultProbability) || 0,
+      outstandingAmount: parseFloat(cardData.outstandingAmount) || 0
+    }} 
+    isOpen={showDM} 
+    onClose={() => setShowDM(false)}
+    transactionAmount={parseFloat(cardData.transactionAmount) || undefined}
+  />
 </div>
 );
 

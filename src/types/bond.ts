@@ -62,6 +62,119 @@ export interface Bond {
   updatedAt: string;
 }
 
+// 新增：交易資料介面
+export interface TradingData {
+  isin: string;
+  tradingDate: string;
+  bidPrice: number;
+  askPrice: number;
+  lastPrice: number;
+  volume: number;
+  yieldToMaturity: number;
+  spread: number;
+  source: string;
+}
+
+// 新增：付息計劃介面
+export interface PaymentFlow {
+  isin: string;
+  paymentDate: string;
+  paymentType: 'Coupon' | 'Principal' | 'Call' | 'Put';
+  amount: number;
+  currency: string;
+  accruedDays: number;
+  accruedInterest: number;
+  principalAmount?: number;
+  couponRate?: number;
+}
+
+// 新增：違約風險資料介面
+export interface DefaultRisk {
+  isin: string;
+  defaultProbability1Y: number;
+  defaultProbability5Y: number;
+  recoveryRate: number;
+  creditSpread: number;
+  lastUpdated: string;
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Very High';
+}
+
+// 新增：期權資料介面
+export interface OptionData {
+  isin: string;
+  optionType: 'Call' | 'Put' | 'Both';
+  callDate?: string;
+  putDate?: string;
+  callPrice?: number;
+  putPrice?: number;
+  callNoticeDays?: number;
+  putNoticeDays?: number;
+  isCallable: boolean;
+  isPutable: boolean;
+}
+
+// 新增：擔保人資料介面
+export interface GuarantorData {
+  isin: string;
+  guarantorName: string;
+  guarantorType: 'Corporate' | 'Government' | 'Bank' | 'Insurance';
+  guaranteeAmount: number;
+  guaranteeCurrency: string;
+  guaranteePercentage: number;
+  creditRating: string;
+  country: string;
+}
+
+// 擴展的債券資料介面（包含所有 API 資料）
+export interface ExtendedBond extends Bond {
+  // 交易資料
+  tradingData?: TradingData[];
+  latestTrading?: TradingData;
+  
+  // 付息計劃
+  paymentFlows?: PaymentFlow[];
+  nextPayments?: PaymentFlow[];
+  
+  // 違約風險
+  defaultRisk?: DefaultRisk;
+  
+  // 期權資料
+  optionData?: OptionData;
+  
+  // 擔保人資料
+  guarantors?: GuarantorData[];
+  
+  // 發行人詳細信息
+  emitentInfo?: {
+    id: string;
+    name_eng: string;
+    full_name_eng: string;
+    type_name_eng: string;
+    branch_name_eng: string;
+    country_name_eng: string;
+    profile_eng: string;
+    profile_zh?: string; // 中文版發行者簡介
+    emitent_address_eng: string;
+    site_eng: string;
+    emitent_lei?: string;
+    cik?: string;
+    swift?: string;
+  };
+  
+  // API 狀態
+  dataStatus: {
+    emissions: 'loaded' | 'loading' | 'error';
+    tradings: 'loaded' | 'loading' | 'error';
+    flows: 'loaded' | 'loading' | 'error';
+    defaults: 'loaded' | 'loading' | 'error';
+    options: 'loaded' | 'loading' | 'error';
+    guarantors: 'loaded' | 'loading' | 'error';
+  };
+  
+  // 最後更新時間
+  lastDataUpdate: string;
+}
+
 // Sample bond data - AAPL example
 export const sampleBond: Bond = {
   id: '1',
