@@ -29,6 +29,8 @@ class AuthManager {
       const data = await response.json();
       this.token = data.token;
       localStorage.setItem('token', this.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('accountType', JSON.stringify(data.accountType));
       return data;
     } catch (error) {
       console.error('登录错误:', error);
@@ -49,6 +51,8 @@ class AuthManager {
   logout() {
     this.token = null;
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('accountType');
   }
   
   isLoggedIn() {
@@ -105,12 +109,12 @@ const API = {
   },
   
   async getEmissionDefault(isin) {
-    const endpoint = isin ? `/api/cbonds/get_emission_default?isin=${isin}` : '/api/cbonds/get_emission_default';
+    const endpoint = isin ? `/api/financial-data/get_emission_default?isin=${isin}` : '/api/financial-data/get_emission_default';
     return await apiCall(endpoint);
   },
   
   async getTradingsNew(isin, sortBy = 'date_desc') {
-    let endpoint = '/api/cbonds/get_tradings_new';
+    let endpoint = '/api/financial-data/get_tradings_new';
     const params = [];
     if (isin) params.push(`isin=${isin}`);
     if (sortBy) params.push(`sort_by=${sortBy}`);
@@ -119,17 +123,17 @@ const API = {
   },
   
   async getFlowNew(isin) {
-    const endpoint = isin ? `/api/cbonds/get_flow_new?isin=${isin}` : '/api/cbonds/get_flow_new';
+    const endpoint = isin ? `/api/financial-data/get_flow_new?isin=${isin}` : '/api/financial-data/get_flow_new';
     return await apiCall(endpoint);
   },
   
   async getOffert(isin) {
-    const endpoint = isin ? `/api/cbonds/get_offert?isin=${isin}` : '/api/cbonds/get_offert';
+    const endpoint = isin ? `/api/financial-data/get_offert?isin=${isin}` : '/api/financial-data/get_offert';
     return await apiCall(endpoint);
   },
   
   async getEmissionGuarantors(isin) {
-    const endpoint = isin ? `/api/cbonds/get_emission_guarantors?isin=${isin}` : '/api/cbonds/get_emission_guarantors';
+    const endpoint = isin ? `/api/financial-data/get_emission_guarantors?isin=${isin}` : '/api/financial-data/get_emission_guarantors';
     return await apiCall(endpoint);
   },
   
@@ -420,15 +424,152 @@ async function priceQueryExample() {
   }
 }
 
+// 帳號分類管理類
+class AccountTypeManager {
+  constructor() {
+    this.accountType = this.getAccountType();
+  }
+  
+  getAccountType() {
+    const accountTypeStr = localStorage.getItem('accountType');
+    return accountTypeStr ? JSON.parse(accountTypeStr) : null;
+  }
+  
+  // 根據帳號分類顯示不同介面
+  applyAccountType() {
+    if (!this.accountType) return;
+    
+    console.log(`帳號類型: ${this.accountType.type}`);
+    console.log(`顯示名稱: ${this.accountType.displayName}`);
+    console.log(`分類: ${this.accountType.category}`);
+    
+    // 根據分類設置不同的CSS主題
+    document.body.className = `${this.accountType.category}-theme`;
+    
+    // 根據分類顯示/隱藏功能區塊
+    this.toggleFeatures();
+  }
+  
+  toggleFeatures() {
+    const { category } = this.accountType;
+    
+    // 隱藏所有功能區塊
+    const features = document.querySelectorAll('[data-feature]');
+    features.forEach(feature => feature.style.display = 'none');
+    
+    // 根據分類顯示對應功能
+    switch (category) {
+      case 'management':
+        this.showFeatures(['user-management', 'system-settings', 'audit-logs', 'bulk-operations']);
+        break;
+      case 'analysis':
+        this.showFeatures(['analytics-dashboard', 'custom-reports', 'portfolio-analysis', 'forecast-tools']);
+        break;
+      case 'investment':
+        this.showFeatures(['investment-dashboard', 'portfolio-management', 'risk-assessment', 'compliance-check']);
+        break;
+      case 'automation':
+        this.showFeatures(['bot-controls', 'automation-scripts', 'scheduled-tasks', 'api-monitoring']);
+        break;
+      case 'basic':
+      default:
+        this.showFeatures(['basic-search', 'favorites', 'basic-reports']);
+        break;
+    }
+  }
+  
+  showFeatures(featureNames) {
+    featureNames.forEach(name => {
+      const feature = document.querySelector(`[data-feature="${name}"]`);
+      if (feature) {
+        feature.style.display = 'block';
+      }
+    });
+  }
+  
+  // 檢查是否為特定帳號類型
+  isAccountType(type) {
+    return this.accountType && this.accountType.type === type;
+  }
+  
+  // 檢查是否為特定分類
+  isCategory(category) {
+    return this.accountType && this.accountType.category === category;
+  }
+  
+  // 獲取帳號類型信息
+  getAccountInfo() {
+    return this.accountType;
+  }
+}
+
+// 帳號分類使用示例
+async function accountTypeExample() {
+  console.log('=== 帳號分類示例 ===');
+  
+  try {
+    const authManager = new AuthManager();
+    const accountManager = new AccountTypeManager();
+    
+    // 測試不同帳號類型
+    const testAccounts = [
+      { username: 'admin', password: 'admin123' },
+      { username: 'analyst', password: 'analyst123' },
+      { username: 'entrust001', password: '2tTokhjidE' },
+      { username: 'ubot001', password: 'ubot123456' },
+      { username: 'user1', password: 'user123' }
+    ];
+    
+    for (const account of testAccounts) {
+      console.log(`\n--- 測試帳號: ${account.username} ---`);
+      
+      try {
+        // 登入
+        const loginResult = await authManager.login(account.username, account.password);
+        console.log('登入成功');
+        console.log('帳號類型:', loginResult.accountType);
+        
+        // 應用帳號分類
+        accountManager.applyAccountType();
+        
+        // 檢查帳號類型
+        if (accountManager.isAccountType('admin')) {
+          console.log('✅ 這是管理員帳號');
+        }
+        if (accountManager.isCategory('investment')) {
+          console.log('✅ 這是投資相關帳號');
+        }
+        if (accountManager.isCategory('automation')) {
+          console.log('✅ 這是自動化帳號');
+        }
+        
+        // 登出
+        authManager.logout();
+        console.log('已登出');
+        
+      } catch (error) {
+        console.error('登入失敗:', error.message);
+      }
+    }
+    
+    console.log('\n=== 帳號分類示例完成 ===');
+    
+  } catch (error) {
+    console.error('帳號分類示例失敗:', error);
+  }
+}
+
 // 在浏览器环境中，将API对象挂载到window
 if (typeof window !== 'undefined') {
   window.API = API;
   window.AuthManager = AuthManager;
+  window.AccountTypeManager = AccountTypeManager;
   window.apiExamples = {
     example,
     errorHandlingExample,
     batchQueryExample,
     translationExample,
-    priceQueryExample
+    priceQueryExample,
+    accountTypeExample
   };
 }

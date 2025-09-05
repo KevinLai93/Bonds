@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Download, Plus, ChevronDown, ChevronUp, MoreHorizontal,
-  GripVertical, Eye, FileText, FileImage, Upload, Palette, AlertCircle, X
+  GripVertical, Eye, FileText, FileImage, Upload, Palette, AlertCircle, X, Edit3, Check, X as XIcon
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import html2canvas from 'html2canvas';
@@ -17,10 +17,28 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { sampleBond, type Bond } from '@/types/bond';
+import { sampleBond, type Bond, type ExtendedBond } from '@/types/bond';
 import { ProfessionalBondCard } from '@/components/ProfessionalBondCard';
 import { useBondSearch } from '@/contexts/BondSearchContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { BondDMModal } from '@/components/bond-dm/BondDMModal';
+
+// 格式化數字：添加千分位，當小數點後無數字時不顯示兩位數
+const formatNumber = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '';
+  
+  // 如果是整數，不顯示小數點
+  if (num % 1 === 0) {
+    return num.toLocaleString();
+  }
+  
+  // 有小數點時，保留兩位小數並添加千分位
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+};
 
 // === A4 常數（輸出像素） ===
 export const PX_A4_300 = { w: 2480, h: 3508 }; // 210/25.4*300, 297/25.4*300
@@ -69,6 +87,7 @@ interface EditableCardData {
   transactionAmount: string;
   totalSettlement: string;
   remainingYears: string;
+  tradeDirection: string; // 買賣方向
 
   // 三大評等
   spRating: string;
@@ -105,11 +124,33 @@ interface ThemeConfig {
 const CardEditor = () => {
   const { isin } = useParams<{ isin: string }>();
   const { bond: searchedBond, extendedBond, searchByISIN } = useBondSearch();
+  const { accountType } = useAuth();
+  
+  // 根據 accountType 獲取標題背景色
+  const getHeaderBackgroundColor = () => {
+    if (!accountType) {
+      return '#54b5e9'; // 預設 EUF 顏色
+    }
+    
+    switch (accountType.type) {
+      case 'entrust':
+        return '#E60012'; // 使用現有的品牌色 (對應 var(--brand-600))
+      case 'ubot':
+        return '#16899d'; // Ubot 專用色
+      default:
+        return '#54b5e9'; // EUF 顏色
+    }
+  };
+  
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [isExtractingColors, setIsExtractingColors] = useState(false);
   const [openAccordions, setOpenAccordions] = useState<string[]>(['header', 'basic-info', 'pricing', 'ratings']);
+  
+  // 編輯狀態管理
+  const [editingFields, setEditingFields] = useState<Set<string>>(new Set());
+  const [tempValues, setTempValues] = useState<Record<string, string>>({});
 
   // 預覽狀態與參考
   const [showPreview, setShowPreview] = useState(false);
@@ -136,10 +177,28 @@ const CardEditor = () => {
   
   // 如果沒有找到債券資料，嘗試搜尋
   useEffect(() => {
-    if (!bond && isin && isin !== searchedBond?.isin) {
+    if (!bond && isin && isin !== searchedBond?.isin && isin !== extendedBond?.isin) {
+      console.log('CardEditor - 沒有找到債券資料，開始搜尋:', isin);
       searchByISIN(isin);
     }
-  }, [bond, isin, searchedBond?.isin, searchByISIN]);
+  }, [bond, isin, searchedBond?.isin, extendedBond?.isin, searchByISIN]);
+
+  // 如果沒有債券資料且正在搜尋，顯示載入狀態
+  if (!bond && isin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">載入債券資料中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 當 isin 改變時，重置初始化狀態
+  useEffect(() => {
+    setIsInitialized(false);
+  }, [isin]);
 
   // 當 extendedBond 數據加載完成後，重新初始化 cardData
   useEffect(() => {
@@ -154,15 +213,21 @@ const CardEditor = () => {
     if (extendedBond && extendedBond.isin === isin && !isInitialized) {
       console.log('CardEditor - extendedBond 數據已加載，重新初始化 cardData');
       
-      // 計算 YTM - 直接乘以 100 並四捨五入到小數點第二位
+      // 計算 YTM - 檢查是否需要轉換
       let ytmValue = '';
       if (extendedBond.yieldToMaturity && extendedBond.yieldToMaturity > 0) {
-        let finalYtm = extendedBond.yieldToMaturity * 100; // 直接乘以 100
+        let finalYtm = extendedBond.yieldToMaturity;
+        
+        // 如果 YTM 值小於 1，表示是小數形式，需要乘以 100 轉換為百分比
+        if (finalYtm < 1) {
+          finalYtm = finalYtm * 100;
+        }
+        
         finalYtm = Math.round(finalYtm * 100) / 100; // 四捨五入到小數點第二位
         ytmValue = finalYtm.toString();
         console.log('CardEditor - YTM 計算:', {
           original: extendedBond.yieldToMaturity,
-          multiplied: extendedBond.yieldToMaturity * 100,
+          isLessThanOne: extendedBond.yieldToMaturity < 1,
           final: finalYtm,
           ytmValue: ytmValue
         });
@@ -230,11 +295,12 @@ const CardEditor = () => {
         bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
         ytm: '',
         askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
-        tradingPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
+        tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
         quantity: '30000.00',
         transactionAmount: '1000000.00',
         totalSettlement: '1000000.00',
         remainingYears: bond.remainingYears?.toString() || '',
+        tradeDirection: '買',
         spRating: bond.spRating || '',
         moodyRating: bond.moodyRating || '',
         fitchRating: bond.fitchRating || '',
@@ -280,6 +346,7 @@ const CardEditor = () => {
       transactionAmount: '',
       totalSettlement: '',
       remainingYears: '',
+      tradeDirection: '買',
       spRating: '',
       moodyRating: '',
       fitchRating: '',
@@ -318,7 +385,7 @@ const CardEditor = () => {
         bidPrice: bond.bidPrice?.toString() || prev.bidPrice,
         // ytm 由專門的 useEffect 處理，這裡不設置
         askPrice: bond.askPrice?.toString() || prev.askPrice,
-        tradingPrice: bond.bidPrice?.toString() || prev.tradingPrice,
+        tradingPrice: bond.askPrice?.toString() || prev.tradingPrice, // 預設使用買價
         remainingYears: bond.remainingYears?.toString() || prev.remainingYears,
         spRating: bond.spRating || prev.spRating,
         moodyRating: bond.moodyRating || prev.moodyRating,
@@ -385,6 +452,25 @@ const CardEditor = () => {
     setCardData(prev => {
       const newData = { ...prev, [field]: value as any };
       
+      // 當買價或賣價改變時，如果當前選擇的方向對應，也要更新參考價格和數量
+      if (field === 'bidPrice' && prev.tradeDirection === '賣') {
+        newData.tradingPrice = value as string;
+        // 重新計算數量
+        const price = parseFloat(value as string);
+        const transactionAmount = parseFloat(prev.transactionAmount);
+        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
+          newData.quantity = (transactionAmount / price).toFixed(2);
+        }
+      } else if (field === 'askPrice' && prev.tradeDirection === '買') {
+        newData.tradingPrice = value as string;
+        // 重新計算數量
+        const price = parseFloat(value as string);
+        const transactionAmount = parseFloat(prev.transactionAmount);
+        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
+          newData.quantity = (transactionAmount / price).toFixed(2);
+        }
+      }
+      
       // 當參考價格或數量改變時，自動計算交易金額
       if (field === 'tradingPrice' || field === 'quantity') {
         const price = parseFloat(field === 'tradingPrice' ? value as string : prev.tradingPrice);
@@ -446,6 +532,84 @@ const CardEditor = () => {
     } else {
       setCardData(prev => ({ ...prev, ytm: value }));
     }
+  }, []);
+
+  // 編輯相關函數
+  const startEditing = useCallback((field: string) => {
+    setEditingFields(prev => new Set(prev).add(field));
+    setTempValues(prev => ({ ...prev, [field]: cardData[field as keyof EditableCardData] as string }));
+  }, [cardData]);
+
+  const cancelEditing = useCallback((field: string) => {
+    setEditingFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(field);
+      return newSet;
+    });
+    setTempValues(prev => {
+      const newTemp = { ...prev };
+      delete newTemp[field];
+      return newTemp;
+    });
+  }, []);
+
+  const saveEditing = useCallback((field: string) => {
+    const newValue = tempValues[field];
+    if (newValue !== undefined) {
+      // 特殊處理 investorType，因為它是數組
+      if (field === 'investorType') {
+        handleInputChange(field as keyof EditableCardData, [newValue]);
+      } else {
+        handleInputChange(field as keyof EditableCardData, newValue);
+      }
+    }
+    setEditingFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(field);
+      return newSet;
+    });
+    setTempValues(prev => {
+      const newTemp = { ...prev };
+      delete newTemp[field];
+      return newTemp;
+    });
+  }, [tempValues, handleInputChange]);
+
+  const handleTempValueChange = useCallback((field: string, value: string) => {
+    setTempValues(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  // 處理買賣方向變更
+  const handleTradeDirectionChange = useCallback((direction: string) => {
+    setCardData(prev => {
+      let newTradingPrice = '';
+      
+      if (direction === '買') {
+        // 選擇「買」時，參考價格使用「參考客戶買價」
+        newTradingPrice = prev.askPrice || '';
+      } else if (direction === '賣') {
+        // 選擇「賣」時，參考價格使用「參考客戶賣價」
+        newTradingPrice = prev.bidPrice || '';
+      }
+      
+      // 當參考價格改變時，根據交易金額重新計算數量
+      let newQuantity = prev.quantity;
+      if (newTradingPrice && prev.transactionAmount) {
+        const price = parseFloat(newTradingPrice);
+        const transactionAmount = parseFloat(prev.transactionAmount);
+        
+        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
+          newQuantity = (transactionAmount / price).toFixed(2);
+        }
+      }
+      
+      return {
+        ...prev,
+        tradeDirection: direction,
+        tradingPrice: newTradingPrice,
+        quantity: newQuantity
+      };
+    });
   }, []);
 
   // ===== 顏色處理（沿用你原本） =====
@@ -982,10 +1146,10 @@ return (
 
         <div className="flex items-center gap-3">
           {false && (
-            <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="flex items-center space-x-2">
-              <Eye className="w-4 h-4" />
-              <span>預覽</span>
-            </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="flex items-center space-x-2">
+            <Eye className="w-4 h-4" />
+            <span>預覽</span>
+          </Button>
           )}
 
           <Button variant="outline" size="sm" onClick={() => setShowDM(true)} className="flex items-center space-x-2">
@@ -994,42 +1158,42 @@ return (
           </Button>
 
           {false && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  disabled={isExporting}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  {isExporting ? '匯出中...' : '匯出'}
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem 
-                  onClick={() => downloadPNG(300)}
-                  disabled={isExporting}
-                >
-                  <FileImage className="w-4 h-4 mr-2" />
-                  PNG 300DPI (A4)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => downloadPNG(150)}
-                  disabled={isExporting}
-                >
-                  <FileImage className="w-4 h-4 mr-2" />
-                  PNG 150DPI (A4)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={downloadPDF}
-                  disabled={isExporting}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  PDF A4
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                disabled={isExporting}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isExporting ? '匯出中...' : '匯出'}
+                <ChevronDown className="w-4 h-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem 
+                onClick={() => downloadPNG(300)}
+                disabled={isExporting}
+              >
+                <FileImage className="w-4 h-4 mr-2" />
+                PNG 300DPI (A4)
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => downloadPNG(150)}
+                disabled={isExporting}
+              >
+                <FileImage className="w-4 h-4 mr-2" />
+                PNG 150DPI (A4)
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={downloadPDF}
+                disabled={isExporting}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                PDF A4
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           )}
         </div>
       </div>
@@ -1046,7 +1210,10 @@ return (
         <div className="space-y-4">
           {/* 報告標題 / 品牌樣式 - 已隱藏 */}
           {false && <Card className="shadow-card">
-            <div className={`p-1 rounded-t-lg transition-colors ${openAccordions.includes('header') ? 'bg-brand-600' : ''}`}>
+            <div 
+              className="p-1 rounded-t-lg transition-colors" 
+              style={{ backgroundColor: openAccordions.includes('header') ? getHeaderBackgroundColor() : '' }}
+            >
               <div className="flex items-center p-3">
                 <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleAccordion('header')}>
                   <GripVertical className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -1152,7 +1319,10 @@ return (
 
           {/* 債券基本資訊 */}
           <Card className="shadow-card">
-            <div className={`p-1 rounded-t-lg transition-colors ${openAccordions.includes('basic-info') ? 'bg-brand-600' : ''}`}>
+            <div 
+              className="p-1 rounded-t-lg transition-colors" 
+              style={{ backgroundColor: openAccordions.includes('basic-info') ? getHeaderBackgroundColor() : '' }}
+            >
               <div className="flex items-center p-3">
                 <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleAccordion('basic-info')}>
                   <GripVertical className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -1179,19 +1349,19 @@ return (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="productName">商品名稱 Name of Product</Label>
-                    <Input id="productName" value={cardData.productName} onChange={(e) => handleInputChange('productName', e.target.value)} />
+                    <Input id="productName" value={cardData.productName} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                   <div>
                     <Label htmlFor="isin">債券代碼 ISIN Code {!cardData.isin && <AlertCircle className="inline w-4 h-4 ml-1 text-destructive" />}</Label>
-                    <Input id="isin" value={cardData.isin} onChange={(e) => handleInputChange('isin', e.target.value)} className={!cardData.isin ? 'border-destructive' : ''} />
+                    <Input id="isin" value={cardData.isin} readOnly className={`bg-gray-50 text-gray-500 ${!cardData.isin ? 'border-destructive' : ''}`} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="currency">幣別 Currency</Label>
-                    <Select value={cardData.currency} onValueChange={(v) => handleInputChange('currency', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={cardData.currency} disabled>
+                      <SelectTrigger className="bg-gray-50 text-gray-500"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="EUR">EUR</SelectItem>
@@ -1202,12 +1372,12 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="couponRate">票面利息 (%)</Label>
-                    <Input id="couponRate" type="number" step="0.01" value={cardData.couponRate} onChange={(e) => handleInputChange('couponRate', e.target.value)} />
+                    <Input id="couponRate" type="number" step="0.01" value={cardData.couponRate} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                   <div>
                     <Label htmlFor="couponType">票息類型</Label>
-                    <Select value={cardData.couponType} onValueChange={(v) => handleInputChange('couponType', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={cardData.couponType} disabled>
+                      <SelectTrigger className="bg-gray-50 text-gray-500"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="固定">固定</SelectItem>
                         <SelectItem value="浮動">浮動</SelectItem>
@@ -1222,26 +1392,106 @@ return (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="issuer">債券發行人</Label>
-                    <Input id="issuer" value={cardData.issuer} onChange={(e) => handleInputChange('issuer', e.target.value)} />
+                    <Input id="issuer" value={cardData.issuer} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                   <div>
                     <Label htmlFor="industry">產業別</Label>
-                    <Input id="industry" value={cardData.industry} onChange={(e) => handleInputChange('industry', e.target.value)} />
+                    <Input id="industry" value={cardData.industry} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="minAmount">最小承作金額(原幣)</Label>
-                    <Input id="minAmount" type="number" value={cardData.minAmount} onChange={(e) => handleInputChange('minAmount', e.target.value)} />
+                    <Label htmlFor="minAmount" className="flex items-center justify-between">
+                      最小承作金額(原幣)
+                      {!editingFields.has('minAmount') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('minAmount')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('minAmount') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="minAmount"
+                          type="number"
+                          value={tempValues.minAmount || ''}
+                          onChange={(e) => handleTempValueChange('minAmount', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('minAmount')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('minAmount')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="minAmount" type="number" value={cardData.minAmount} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="minIncrement">最小累加金額(原幣)</Label>
-                    <Input id="minIncrement" type="number" value={cardData.minIncrement} onChange={(e) => handleInputChange('minIncrement', e.target.value)} />
+                    <Label htmlFor="minIncrement" className="flex items-center justify-between">
+                      最小累加金額(原幣)
+                      {!editingFields.has('minIncrement') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('minIncrement')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('minIncrement') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="minIncrement"
+                          type="number"
+                          value={tempValues.minIncrement || ''}
+                          onChange={(e) => handleTempValueChange('minIncrement', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('minIncrement')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('minIncrement')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="minIncrement" type="number" value={cardData.minIncrement} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="remainingYears">剩餘年期</Label>
-                    <Input id="remainingYears" type="number" step="0.01" value={cardData.remainingYears} onChange={(e) => handleInputChange('remainingYears', e.target.value)} />
+                    <Input id="remainingYears" type="number" step="0.01" value={cardData.remainingYears} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                 </div>
 
@@ -1258,23 +1508,64 @@ return (
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="accruedInterest">前手息（每一萬面額）</Label>
-                    <Input id="accruedInterest" type="number" step="0.01" value={cardData.accruedInterest} onChange={(e) => handleInputChange('accruedInterest', e.target.value)} />
+                    <Label htmlFor="accruedInterest" className="flex items-center justify-between">
+                      前手息（每一萬面額）
+                      {!editingFields.has('accruedInterest') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('accruedInterest')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('accruedInterest') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="accruedInterest"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.accruedInterest || ''}
+                          onChange={(e) => handleTempValueChange('accruedInterest', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('accruedInterest')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('accruedInterest')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="accruedInterest" type="number" step="0.01" value={cardData.accruedInterest} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="issueDate">發行日</Label>
-                    <Input id="issueDate" type="date" value={cardData.issueDate.split('/').reverse().join('-')} onChange={(e) => handleInputChange('issueDate', e.target.value.split('-').reverse().join('/'))} />
+                    <Input id="issueDate" type="date" value={cardData.issueDate.split('/').reverse().join('-')} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                   <div>
                     <Label htmlFor="maturityDate">到期日</Label>
-                    <Input id="maturityDate" type="date" value={cardData.maturityDate.split('/').reverse().join('-')} onChange={(e) => handleInputChange('maturityDate', e.target.value.split('-').reverse().join('/'))} />
+                    <Input id="maturityDate" type="date" value={cardData.maturityDate.split('/').reverse().join('-')} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                   <div>
                     <Label htmlFor="nextCouponDate">下一配息日</Label>
-                    <Input id="nextCouponDate" type="date" value={cardData.nextCouponDate.split('/').reverse().join('-')} onChange={(e) => handleInputChange('nextCouponDate', e.target.value.split('-').reverse().join('/'))} />
+                    <Input id="nextCouponDate" type="date" value={cardData.nextCouponDate.split('/').reverse().join('-')} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                 </div>
               </CardContent>
@@ -1283,7 +1574,10 @@ return (
 
           {/* 價格與殖利率 */}
           <Card className="shadow-card">
-            <div className={`p-1 rounded-t-lg transition-colors ${openAccordions.includes('pricing') ? 'bg-brand-600' : ''}`}>
+            <div 
+              className="p-1 rounded-t-lg transition-colors" 
+              style={{ backgroundColor: openAccordions.includes('pricing') ? getHeaderBackgroundColor() : '' }}
+            >
               <div className="flex items-center p-3">
                 <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleAccordion('pricing')}>
                   <GripVertical className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -1306,60 +1600,278 @@ return (
 
             {openAccordions.includes('pricing') && (
               <CardContent className="space-y-4 pt-4">
+                {/* 買賣方向選擇 */}
+                <div className="mb-4">
+                  <Label htmlFor="tradeDirection">交易方向</Label>
+                  <Select value={cardData.tradeDirection} onValueChange={handleTradeDirectionChange}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="買">買</SelectItem>
+                      <SelectItem value="賣">賣</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="bidPrice">參考客戶賣價 (Bid)</Label>
-                    <Input id="bidPrice" type="number" step="0.01" value={cardData.bidPrice} onChange={(e) => handleInputChange('bidPrice', e.target.value)} />
+                    <Label htmlFor="bidPrice" className="flex items-center justify-between">
+                      參考客戶賣價 (Bid)
+                      {!editingFields.has('bidPrice') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('bidPrice')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('bidPrice') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="bidPrice"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.bidPrice || ''}
+                          onChange={(e) => handleTempValueChange('bidPrice', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('bidPrice')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('bidPrice')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="bidPrice" type="number" step="0.01" value={cardData.bidPrice} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="askPrice">參考客戶買價 (Ask)</Label>
-                    <Input id="askPrice" type="number" step="0.01" value={cardData.askPrice} onChange={(e) => handleInputChange('askPrice', e.target.value)} />
+                    <Label htmlFor="askPrice" className="flex items-center justify-between">
+                      參考客戶買價 (Ask)
+                      {!editingFields.has('askPrice') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('askPrice')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('askPrice') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="askPrice"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.askPrice || ''}
+                          onChange={(e) => handleTempValueChange('askPrice', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('askPrice')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('askPrice')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="askPrice" type="number" step="0.01" value={cardData.askPrice} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="ytm">到期殖利率 (%)</Label>
-                    <Input id="ytm" type="number" step="0.01" value={cardData.ytm} onChange={(e) => handleYTMChange(e.target.value)} />
+                    <Input id="ytm" type="number" step="0.01" value={cardData.ytm} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="tradingPrice">參考價格</Label>
-                    <Input id="tradingPrice" type="number" step="0.01" value={cardData.tradingPrice} onChange={(e) => handleInputChange('tradingPrice', e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="quantity">數量 (Quantity)</Label>
-                    <Input id="quantity" type="number" step="0.01" value={cardData.quantity} onChange={(e) => handleInputChange('quantity', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="transactionAmount" className="flex items-center gap-1">
-                      交易金額
-                      {(() => {
-                        const amount = parseFloat(cardData.transactionAmount) || 0;
-                        const minAmount = parseFloat(cardData.minAmount) || 0;
-                        const minIncrement = parseFloat(cardData.minIncrement) || 1;
-                        const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
-                          (amount < minAmount || amount % minIncrement !== 0);
-                        return hasError ? <AlertCircle className="w-4 h-4 text-destructive" /> : null;
-                      })()}
+                    <Label htmlFor="tradingPrice" className="flex items-center justify-between">
+                      參考價格
+                      {!editingFields.has('tradingPrice') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('tradingPrice')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </Label>
-                    <Input 
-                      id="transactionAmount" 
-                      type="number" 
-                      step="0.01" 
-                      value={cardData.transactionAmount} 
-                      onChange={(e) => handleInputChange('transactionAmount', e.target.value)}
-                      className={(() => {
-                        const amount = parseFloat(cardData.transactionAmount) || 0;
-                        const minAmount = parseFloat(cardData.minAmount) || 0;
-                        const minIncrement = parseFloat(cardData.minIncrement) || 1;
-                        const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
-                          (amount < minAmount || amount % minIncrement !== 0);
-                        return hasError ? 'border-destructive' : '';
-                      })()}
-                    />
+                    {editingFields.has('tradingPrice') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="tradingPrice"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.tradingPrice || ''}
+                          onChange={(e) => handleTempValueChange('tradingPrice', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('tradingPrice')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('tradingPrice')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="tradingPrice" type="number" step="0.01" value={cardData.tradingPrice} readOnly className="bg-gray-50" />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="quantity" className="flex items-center justify-between">
+                      數量 (Quantity)
+                      {!editingFields.has('quantity') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('quantity')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('quantity') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="quantity"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.quantity || ''}
+                          onChange={(e) => handleTempValueChange('quantity', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('quantity')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('quantity')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="quantity" type="text" value={formatNumber(cardData.quantity)} readOnly className="bg-gray-50" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="transactionAmount" className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        交易金額
+                        {(() => {
+                          const amount = parseFloat(cardData.transactionAmount) || 0;
+                          const minAmount = parseFloat(cardData.minAmount) || 0;
+                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                          const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
+                            (amount < minAmount || amount % minIncrement !== 0);
+                          return hasError ? <AlertCircle className="w-4 h-4 text-destructive" /> : null;
+                        })()}
+                      </div>
+                      {!editingFields.has('transactionAmount') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('transactionAmount')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('transactionAmount') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="transactionAmount"
+                          type="number"
+                          step="0.01"
+                          value={tempValues.transactionAmount || ''}
+                          onChange={(e) => handleTempValueChange('transactionAmount', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('transactionAmount')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('transactionAmount')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input 
+                        id="transactionAmount" 
+                        type="text" 
+                        value={formatNumber(cardData.transactionAmount)} 
+                        readOnly 
+                        className={`bg-gray-50 ${(() => {
+                          const amount = parseFloat(cardData.transactionAmount) || 0;
+                          const minAmount = parseFloat(cardData.minAmount) || 0;
+                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                          const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
+                            (amount < minAmount || amount % minIncrement !== 0);
+                          return hasError ? 'border-destructive' : '';
+                        })()}`}
+                      />
+                    )}
                     {(() => {
                       const amount = parseFloat(cardData.transactionAmount) || 0;
                       const minAmount = parseFloat(cardData.minAmount) || 0;
@@ -1384,7 +1896,7 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="totalSettlement">總交割金額</Label>
-                    <Input id="totalSettlement" type="number" step="0.01" value={cardData.totalSettlement} readOnly className="bg-gray-50" />
+                    <Input id="totalSettlement" type="text" value={formatNumber(cardData.totalSettlement)} readOnly className="bg-gray-50 text-gray-500" />
                   </div>
                 </div>
               </CardContent>
@@ -1393,7 +1905,10 @@ return (
 
           {/* 三大信評 */}
           <Card className="shadow-card">
-            <div className={`p-1 rounded-t-lg transition-colors ${openAccordions.includes('ratings') ? 'bg-brand-600' : ''}`}>
+            <div 
+              className="p-1 rounded-t-lg transition-colors" 
+              style={{ backgroundColor: openAccordions.includes('ratings') ? getHeaderBackgroundColor() : '' }}
+            >
               <div className="flex items-center p-3">
                 <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleAccordion('ratings')}>
                   <GripVertical className="w-4 h-4 mr-2 text-muted-foreground" />
@@ -1419,24 +1934,141 @@ return (
               <CardContent className="space-y-4 pt-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="spRating">標準普爾 (S&P)</Label>
-                    <Input id="spRating" value={cardData.spRating} onChange={(e) => handleInputChange('spRating', e.target.value)} />
+                    <Label htmlFor="spRating" className="flex items-center justify-between">
+                      標準普爾 (S&P)
+                      {!editingFields.has('spRating') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('spRating')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('spRating') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="spRating"
+                          value={tempValues.spRating || ''}
+                          onChange={(e) => handleTempValueChange('spRating', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('spRating')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('spRating')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="spRating" value={cardData.spRating} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="moodyRating">穆迪 (Moody's)</Label>
-                    <Input id="moodyRating" value={cardData.moodyRating} onChange={(e) => handleInputChange('moodyRating', e.target.value)} />
+                    <Label htmlFor="moodyRating" className="flex items-center justify-between">
+                      穆迪 (Moody's)
+                      {!editingFields.has('moodyRating') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('moodyRating')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('moodyRating') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="moodyRating"
+                          value={tempValues.moodyRating || ''}
+                          onChange={(e) => handleTempValueChange('moodyRating', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('moodyRating')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('moodyRating')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="moodyRating" value={cardData.moodyRating} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="fitchRating">惠譽 (Fitch)</Label>
-                    <Input id="fitchRating" value={cardData.fitchRating} onChange={(e) => handleInputChange('fitchRating', e.target.value)} />
+                    <Label htmlFor="fitchRating" className="flex items-center justify-between">
+                      惠譽 (Fitch)
+                      {!editingFields.has('fitchRating') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditing('fitchRating')}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </Label>
+                    {editingFields.has('fitchRating') ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          id="fitchRating"
+                          value={tempValues.fitchRating || ''}
+                          onChange={(e) => handleTempValueChange('fitchRating', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveEditing('fitchRating')}
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelEditing('fitchRating')}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input id="fitchRating" value={cardData.fitchRating} readOnly className="bg-gray-50" />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="seniority">償還順位</Label>
-                    <Select value={cardData.seniorityRank} onValueChange={(v) => handleInputChange('seniorityRank', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={cardData.seniorityRank} disabled>
+                      <SelectTrigger className="bg-gray-50 text-gray-500"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="優先無擔保">優先無擔保</SelectItem>
                         <SelectItem value="優先有擔保">優先有擔保</SelectItem>
@@ -1447,8 +2079,8 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="paymentFrequency">配息頻率</Label>
-                    <Select value={cardData.paymentFrequency} onValueChange={(v) => handleInputChange('paymentFrequency', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={cardData.paymentFrequency} disabled>
+                      <SelectTrigger className="bg-gray-50 text-gray-500"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="每月">每月</SelectItem>
                         <SelectItem value="每季">每季</SelectItem>
@@ -1461,8 +2093,8 @@ return (
 
                 <div>
                   <Label htmlFor="maturityType">到期類型</Label>
-                  <Select value={cardData.maturityType} onValueChange={(v) => handleInputChange('maturityType', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={cardData.maturityType} disabled>
+                    <SelectTrigger className="bg-gray-50 text-gray-500"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="到期償還">到期償還</SelectItem>
                       <SelectItem value="可贖回">可贖回</SelectItem>
@@ -1529,7 +2161,7 @@ return (
       <PreviewContent />
     </div>
   </DialogContent>
-  </Dialog>
+</Dialog>
 
   {/* DM Modal */}
   <BondDMModal 
@@ -1538,25 +2170,25 @@ return (
       spRating: cardData.spRating,
       moodyRating: cardData.moodyRating,
       fitchRating: cardData.fitchRating,
-      couponRate: cardData.couponRate,
+      couponRate: parseFloat(cardData.couponRate) || 0,
       yieldToMaturity: parseFloat(cardData.ytm) || 0,
-      bidPrice: parseFloat(cardData.bidPrice) || 0,
-      askPrice: parseFloat(cardData.askPrice) || 0,
-      tradingPrice: parseFloat(cardData.tradingPrice) || 0,
+      bidPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
+      askPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
+
       remainingYears: parseFloat(cardData.remainingYears) || 0,
-      minAmount: parseFloat(cardData.minAmount) || 0,
-      minIncrement: parseFloat(cardData.minIncrement) || 0,
+
       issuer: cardData.issuer,
       country: cardData.country,
       industry: cardData.industry,
-      paymentFrequency: cardData.paymentFrequency,
-      maturityType: cardData.maturityType,
-      seniority_text: cardData.seniorityRank,
+      paymentFrequency: cardData.paymentFrequency as "每年" | "每半年" | "每季" | "每月" | "不配",
+      maturityType: cardData.maturityType as "到期償還" | "可提前贖回" | "永續" | "其他",
+      seniority_text: cardData.seniorityRank as "永續" | "優先無擔保" | "優先有擔保" | "次順位",
       issuerDescription: cardData.issuerDescription,
       issuerControl: cardData.issuerControl,
       riskNotes: cardData.riskNotes,
       defaultProbability1Y: parseFloat(cardData.defaultProbability) || 0,
-      outstandingAmount: parseFloat(cardData.outstandingAmount) || 0
+      outstandingAmount: parseFloat(cardData.outstandingAmount) || 0,
+      investorType: cardData.investorType // 使用編輯器選擇的投資人身份
     }} 
     isOpen={showDM} 
     onClose={() => setShowDM(false)}

@@ -1,4 +1,4 @@
-# CBonds API 串接文档
+# Financial Data API 串接文档
 
 ## 🔐 认证系统
 
@@ -29,7 +29,12 @@
     "name": "Administrator"
   },
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": "24h"
+  "expiresIn": "24h",
+  "accountType": {
+    "type": "admin",
+    "displayName": "系統管理員",
+    "category": "management"
+  }
 }
 ```
 
@@ -55,30 +60,84 @@ Authorization: Bearer {JWT_TOKEN}
 ```json
 {
   "success": true,
+  "message": "Profile retrieved successfully",
   "user": {
     "id": 1,
     "username": "admin",
     "role": "admin",
     "name": "Administrator"
+  },
+  "accountType": {
+    "type": "admin",
+    "displayName": "系統管理員",
+    "category": "management"
   }
 }
 ```
 
-## 👥 用户角色
+## 👥 用户角色与账号分类
+
+### 账号分类系统
+系统根据用户名前缀自动识别账号类型，返回对应的分类信息：
+
+| 账号类型 | 显示名称 | 分类 | 识别规则 | 说明 |
+|---------|---------|------|---------|------|
+| **admin** | 系統管理員 | management | 用户名以 `admin` 开头 | 管理員權限 |
+| **analyst** | 財務分析師 | analysis | 用户名以 `analyst` 开头 | 分析師權限 |
+| **entrust** | 信託用戶 | investment | 用户名以 `entrust` 开头 | 投資相關權限 |
+| **ubot** | UBot用戶 | automation | 用户名以 `ubot` 开头 | 自動化權限 |
+| **user** | 一般用戶 | basic | 其他用户名 | 基本權限 |
 
 ### 可用账号
-| 用户名 | 密码 | 角色 | 权限 |
-|--------|------|------|------|
-| admin | admin123 | admin | 所有权限 |
-| user1 | user123 | user | 基本权限 |
-| analyst | analyst123 | analyst | 分析权限 |
+| 用户名 | 密码 | 角色 | 账号类型 | 分类 | 说明 |
+|--------|------|------|---------|------|------|
+| admin | admin123 | admin | admin | management | 系統管理員 |
+| analyst | analyst123 | analyst | analyst | analysis | 財務分析師 |
+| user1 | user123 | user | user | basic | 一般用戶 |
+| entrust001 | 2tTokhjidE | user | entrust | investment | 信託用戶1 |
+| entrust002 | ebR0REdj3f | user | entrust | investment | 信託用戶2 |
+| entrust003 | vu7UrMEG4v | user | entrust | investment | 信託用戶3 |
+| ubot001 | ubot123456 | user | ubot | automation | UBot用戶1 |
+| ubot002 | ubot789012 | user | ubot | automation | UBot用戶2 |
+
+### 前端使用方式
+```javascript
+// 登入後獲取帳號分類
+const loginResult = await fetch('/api/login', {
+  method: 'POST',
+  body: JSON.stringify({ username, password })
+});
+const { accountType } = await loginResult.json();
+
+// 根據分類顯示不同介面
+switch (accountType.category) {
+  case 'management':
+    // 顯示管理介面
+    break;
+  case 'investment':
+    // 顯示投資介面
+    break;
+  case 'automation':
+    // 顯示自動化介面
+    break;
+  case 'analysis':
+    // 顯示分析介面
+    break;
+  default:
+    // 顯示基本介面
+    break;
+}
+
+// 設置CSS主題
+document.body.className = `${accountType.category}-theme`;
+```
 
 ### 角色权限
 - **admin**: 可以访问所有API端点，包括用户管理
 - **user**: 可以访问基本的数据查询API
 - **analyst**: 可以访问分析和数据查询API
 
-## 📡 CBonds API 集成
+## 📡 Financial Data API 集成
 
 ### 3. 获取债券发行数据
 **端点**: `GET /api/get_emissions?isin={ISIN_CODE}&lang={LANGUAGE}`  
@@ -98,13 +157,13 @@ Authorization: Bearer {JWT_TOKEN}
 ```json
 {
   "data": {
-    // CBonds API 返回的债券数据
+    // Financial Data API 返回的债券数据
   }
 }
 ```
 
 ### 4. 获取债券违约数据
-**端点**: `GET /api/cbonds/get_emission_default?isin={ISIN_CODE}`  
+**端点**: `GET /api/financial-data/get_emission_default?isin={ISIN_CODE}`  
 **描述**: 获取债券违约和重组债务数据  
 **认证**: 需要JWT token
 
@@ -129,11 +188,11 @@ Authorization: Bearer {JWT_TOKEN}
 
 **使用示例**:
 ```
-GET /api/cbonds/get_emission_default?isin=US037833DY36
+GET /api/financial-data/get_emission_default?isin=US037833DY36
 ```
 
 ### 5. 获取债券担保人数据
-**端点**: `GET /api/cbonds/get_emission_guarantors?isin={ISIN_CODE}`  
+**端点**: `GET /api/financial-data/get_emission_guarantors?isin={ISIN_CODE}`  
 **描述**: 获取债券担保人信息（如有）  
 **认证**: 需要JWT token
 
@@ -157,7 +216,7 @@ Authorization: Bearer {JWT_TOKEN}
 ```
 
 ### 6. 获取债券付息计划
-**端点**: `GET /api/cbonds/get_flow_new?isin={ISIN_CODE}`  
+**端点**: `GET /api/financial-data/get_flow_new?isin={ISIN_CODE}`  
 **描述**: 获取债券付息计划数据  
 **认证**: 需要JWT token
 
@@ -183,7 +242,7 @@ Authorization: Bearer {JWT_TOKEN}
 **技术说明**: 此端点内部会先将ISIN转换为emission_id，然后使用emission_id进行过滤查询。
 
 ### 7. 获取债券期权数据
-**端点**: `GET /api/cbonds/get_offert?isin={ISIN_CODE}`  
+**端点**: `GET /api/financial-data/get_offert?isin={ISIN_CODE}`  
 **描述**: 获取债券put/call期权数据  
 **认证**: 需要JWT token
 
@@ -207,7 +266,7 @@ Authorization: Bearer {JWT_TOKEN}
 ```
 
 ### 8. 获取债券交易报价数据
-**端点**: `GET /api/cbonds/get_tradings_new?isin={ISIN_CODE}&sort_by={SORT_OPTION}`  
+**端点**: `GET /api/financial-data/get_tradings_new?isin={ISIN_CODE}&sort_by={SORT_OPTION}`  
 **描述**: 获取债券交易所报价数据（最近40天）  
 **认证**: 需要JWT token
 
@@ -237,11 +296,11 @@ Authorization: Bearer {JWT_TOKEN}
 ```bash
 # 獲取最新交易數據（推薦）
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-"http://localhost:3000/api/cbonds/get_tradings_new?isin=US037833DY36&sort_by=date_desc"
+"http://localhost:3000/api/financial-data/get_tradings_new?isin=US037833DY36&sort_by=date_desc"
 
 # 獲取歷史交易數據
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-"http://localhost:3000/api/cbonds/get_tradings_new?isin=US037833DY36&sort_by=date_asc"
+"http://localhost:3000/api/financial-data/get_tradings_new?isin=US037833DY36&sort_by=date_asc"
 ```
 
 **注意**: 
@@ -288,6 +347,7 @@ const login = async (username, password) => {
       // 保存token到localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('accountType', JSON.stringify(data.accountType));
       return data;
     }
   } catch (error) {
@@ -315,6 +375,7 @@ const callProtectedAPI = async (endpoint, options = {}) => {
       // Token过期，重定向到登录页
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('accountType');
       window.location.href = '/login';
       return;
     }
@@ -337,6 +398,7 @@ const getEmissions = async (isin) => {
 const logout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('accountType');
   // 重定向到登录页
   window.location.href = '/login';
 };
@@ -350,9 +412,9 @@ const logout = () => {
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRES_IN=24h
 
-# CBonds API凭据
-CBONDS_LOGIN=kinga@cubeipo.asia
-CBONDS_PASSWORD=Kinga1234$
+# Financial Data API凭据
+FINANCIAL_DATA_LOGIN=your_email@domain.com
+FINANCIAL_DATA_PASSWORD=your_password
 ```
 
 ### 本地开发
@@ -367,7 +429,7 @@ https://localhost:6667
 ### 生产环境
 - 使用AWS Lambda + API Gateway
 - 通过Serverless Framework部署
-- CBonds凭据存储在AWS Systems Manager Parameter Store
+- Financial Data API凭据存储在AWS Systems Manager Parameter Store
 
 ## 🏢 發行人資訊 API
 

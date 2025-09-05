@@ -137,7 +137,7 @@ export const cbondsAPI = {
 
   async getEmissionDefault(isin?: string) {
     const params = isin ? { isin: isin.trim().toUpperCase() } : {};
-    return cbondsGet("cbonds/get_emission_default", params, true);
+    return cbondsGet("financial-data/get_emission_default", params, true);
   },
 
   async getTradingsNew(isin?: string, sortBy: string = 'date_desc') {
@@ -145,22 +145,22 @@ export const cbondsAPI = {
     if (isin) {
       params.isin = isin.trim().toUpperCase();
     }
-    return cbondsGet("cbonds/get_tradings_new", params, true);
+    return cbondsGet("financial-data/get_tradings_new", params, true);
   },
 
   async getFlowNew(isin?: string) {
     const params = isin ? { isin: isin.trim().toUpperCase() } : {};
-    return cbondsGet("cbonds/get_flow_new", params, true);
+    return cbondsGet("financial-data/get_flow_new", params, true);
   },
 
   async getOffert(isin?: string) {
     const params = isin ? { isin: isin.trim().toUpperCase() } : {};
-    return cbondsGet("cbonds/get_offert", params, true);
+    return cbondsGet("financial-data/get_offert", params, true);
   },
 
   async getEmissionGuarantors(isin?: string) {
     const params = isin ? { isin: isin.trim().toUpperCase() } : {};
-    return cbondsGet("cbonds/get_emission_guarantors", params, true);
+    return cbondsGet("financial-data/get_emission_guarantors", params, true);
   },
 
   // 獲取發行人詳細信息

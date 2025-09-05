@@ -337,6 +337,70 @@ const BondDetail = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Credit & Issuer Info */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Building className="w-5 h-5 mr-2 text-primary" />
+                信用 & 發行人資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">發行人</p>
+                <p className="text-xl font-bold">{displayBond.issuer}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">產業別</p>
+                  <Badge variant="outline">
+                    {displayBond.industry || (displayBond as any)?.emitentInfo?.branch_name_eng || '—'}
+                  </Badge>
+                </div>
+                {displayBond.parentCompanyCode && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">母公司代碼</p>
+                    <p className="font-medium">{displayBond.parentCompanyCode}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">信用評等</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={getRatingColor(displayBond.spRating)}>
+                    S&P: {displayBond.spRating}
+                  </Badge>
+                  <Badge className={getRatingColor(displayBond.moodyRating)}>
+                    Moody's: {displayBond.moodyRating}
+                  </Badge>
+                  <Badge className={getRatingColor(displayBond.fitchRating)}>
+                    Fitch: {displayBond.fitchRating}
+                  </Badge>
+                </div>
+              </div>
+              
+              {((displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription) && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">發行者簡介</p>
+                  <p className="text-sm leading-relaxed">
+                    {(displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription}
+                  </p>
+                </div>
+              )}
+              
+              {displayBond.issuerControl && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">發行人控管</p>
+                  <div className="text-sm leading-relaxed whitespace-pre-line">
+                    {displayBond.issuerControl}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Basic & Trading Info */}
           <Card className="shadow-card">
             <CardHeader>
@@ -511,70 +575,6 @@ const BondDetail = () => {
                   {displayBond.tlacMrel ? '適用' : '不適用'}
                 </Badge>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Credit & Issuer Info */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Building className="w-5 h-5 mr-2 text-primary" />
-                信用 & 發行人資訊
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">發行人</p>
-                <p className="text-xl font-bold">{displayBond.issuer}</p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">產業別</p>
-                  <Badge variant="outline">
-                    {displayBond.industry || (displayBond as any)?.emitentInfo?.branch_name_eng || '—'}
-                  </Badge>
-                </div>
-                {displayBond.parentCompanyCode && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">母公司代碼</p>
-                    <p className="font-medium">{displayBond.parentCompanyCode}</p>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">信用評等</p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge className={getRatingColor(displayBond.spRating)}>
-                    S&P: {displayBond.spRating}
-                  </Badge>
-                  <Badge className={getRatingColor(displayBond.moodyRating)}>
-                    Moody's: {displayBond.moodyRating}
-                  </Badge>
-                  <Badge className={getRatingColor(displayBond.fitchRating)}>
-                    Fitch: {displayBond.fitchRating}
-                  </Badge>
-                </div>
-              </div>
-              
-              {((displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription) && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">發行者簡介</p>
-                  <p className="text-sm leading-relaxed">
-                    {(displayBond as any)?.emitentInfo?.profile_eng || displayBond.issuerDescription}
-                  </p>
-                </div>
-              )}
-              
-              {displayBond.issuerControl && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">發行人控管</p>
-                  <div className="text-sm leading-relaxed whitespace-pre-line">
-                    {displayBond.issuerControl}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

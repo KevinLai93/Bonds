@@ -20,11 +20,12 @@ const Index = () => {
     if (searchQuery.trim()) {
       try {
         await searchByISIN(searchQuery.trim());
-        // Only navigate if search was successful and we have results
+        // 搜尋成功後跳轉到搜尋結果頁面
         navigate('/search');
       } catch (err) {
-        // Stay on homepage and show error - don't navigate
+        // 搜尋失敗時也跳轉到搜尋頁面，讓搜尋頁面顯示錯誤訊息
         console.error('Search failed:', err);
+        navigate('/search');
       }
     } else {
       // 沒有輸入ISIN時顯示錯誤提示，不導航到搜尋頁面
@@ -36,11 +37,12 @@ const Index = () => {
     setSearchQuery('US037833DY36');
     try {
       await searchByISIN('US037833DY36');
-      // Only navigate if search was successful
+      // 搜尋成功後跳轉到搜尋結果頁面
       navigate('/search');
     } catch (err) {
-      // Stay on homepage and show error
+      // 搜尋失敗時也跳轉到搜尋頁面，讓搜尋頁面顯示錯誤訊息
       console.error('Search failed:', err);
+      navigate('/search');
     }
   };
 

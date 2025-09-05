@@ -9,8 +9,15 @@ interface User {
   email?: string;
 }
 
+interface AccountType {
+  type: string;
+  displayName: string;
+  category: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  accountType: AccountType | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -33,20 +40,28 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
 
   // 檢查本地儲存的登入狀態
   useEffect(() => {
     const savedUser = localStorage.getItem('bonds_user');
+    const savedAccountType = localStorage.getItem('bonds_account_type');
     const token = localStorage.getItem('token');
     
     if (savedUser && token) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
+        
+        if (savedAccountType) {
+          const accountTypeData = JSON.parse(savedAccountType);
+          setAccountType(accountTypeData);
+        }
       } catch (error) {
         console.error('Error parsing saved user data:', error);
         localStorage.removeItem('bonds_user');
+        localStorage.removeItem('bonds_account_type');
         localStorage.removeItem('token');
       }
     }
@@ -68,6 +83,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         setUser(userData);
         localStorage.setItem('bonds_user', JSON.stringify(userData));
+        
+        // 獲取 accountType 信息
+        try {
+          const profileResponse = await cbondsAPI.getProfile();
+          if (profileResponse.success && profileResponse.accountType) {
+            setAccountType(profileResponse.accountType);
+            localStorage.setItem('bonds_account_type', JSON.stringify(profileResponse.accountType));
+          }
+        } catch (profileError) {
+          console.warn('Failed to fetch account type:', profileError);
+        }
+        
         return true;
       }
       return false;
@@ -80,12 +107,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     cbondsAPI.logout();
     setUser(null);
+    setAccountType(null);
     localStorage.removeItem('bonds_user');
+    localStorage.removeItem('bonds_account_type');
     localStorage.removeItem('token');
   };
 
   const value: AuthContextType = {
     user,
+    accountType,
     isAuthenticated: !!user,
     login,
     logout,
