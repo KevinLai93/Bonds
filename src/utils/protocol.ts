@@ -72,12 +72,13 @@ export function getProdApiUrl(): string {
   
   if (config.autoDetection) {
     if (config.isHttps || config.forceHttps) {
-      return import.meta.env.VITE_PROD_API_BASE_URL_HTTPS || window.location.origin;
+      return import.meta.env.VITE_PROD_API_BASE_URL_HTTPS || `${window.location.protocol}//${window.location.hostname}:${import.meta.env.VITE_API_PORT || '3000'}`;
     } else {
-      return import.meta.env.VITE_PROD_API_BASE_URL_HTTP || window.location.origin;
+      return import.meta.env.VITE_PROD_API_BASE_URL_HTTP || `${window.location.protocol}//${window.location.hostname}:${import.meta.env.VITE_API_PORT || '3000'}`;
     }
   } else {
-    return window.location.origin;
+    // 如果沒有設定環境變數，使用同一個 hostname 但不同的 port
+    return `${window.location.protocol}//${window.location.hostname}:${import.meta.env.VITE_API_PORT || '3000'}`;
   }
 }
 
