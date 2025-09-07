@@ -87,6 +87,16 @@ async function cbondsGet(endpoint: string, params: any = {}, requiresAuth: boole
     }
     
     const json = await res.json();
+    
+    // 檢查回應中是否包含 TOKEN 失效錯誤
+    if (json.error === "Invalid token" || json.code === "INVALID_TOKEN") {
+      console.log('檢測到 TOKEN 失效:', json);
+      authManager.clearToken();
+      // 觸發登出事件
+      window.dispatchEvent(new CustomEvent('tokenExpired', { detail: { message: '當前登入已失效，請重新登入' } }));
+      throw new Error('當前登入已失效，請重新登入');
+    }
+    
     console.log('本機 API 回應資料:', json);
     return json;
     

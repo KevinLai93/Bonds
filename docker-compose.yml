@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # 前端服務
+  frontend:
+    build: .
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - VITE_FORCE_HTTPS=true
+      - VITE_API_PORT=3000
+      - VITE_PROD_API_BASE_URL_HTTPS=https://your-domain.com:3000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # API 服務（如果 API 也在 Docker 中）
+  api:
+    image: your-api-image:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - CORS_ORIGIN=https://your-domain.com
+    restart: unless-stopped
+
+  # Nginx 反向代理（可選）
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl  # SSL 證書目錄
+    depends_on:
+      - frontend
+      - api
+    restart: unless-stopped

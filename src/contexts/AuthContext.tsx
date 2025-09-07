@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { cbondsAPI } from '@/services/cbonds';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: number;
@@ -42,6 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // 檢查本地儲存的登入狀態
   useEffect(() => {
@@ -67,6 +70,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  const logout = () => {
+    cbondsAPI.logout();
+    setUser(null);
+    setAccountType(null);
+    localStorage.removeItem('bonds_user');
+    localStorage.removeItem('bonds_account_type');
+    localStorage.removeItem('token');
+  };
+
+  // 監聽 TOKEN 失效事件
+  useEffect(() => {
+    const handleTokenExpired = (event: CustomEvent) => {
+      const message = event.detail?.message || '當前登入已失效，請重新登入';
+      
+      // 顯示提示訊息
+      toast.error(message);
+      
+      // 執行登出
+      logout();
+      
+      // 跳轉到登入頁面
+      navigate('/login');
+    };
+
+    // 添加事件監聽器
+    window.addEventListener('tokenExpired', handleTokenExpired as EventListener);
+
+    // 清理事件監聽器
+    return () => {
+      window.removeEventListener('tokenExpired', handleTokenExpired as EventListener);
+    };
+  }, [navigate]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
@@ -102,15 +138,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Login failed:', error);
       return false;
     }
-  };
-
-  const logout = () => {
-    cbondsAPI.logout();
-    setUser(null);
-    setAccountType(null);
-    localStorage.removeItem('bonds_user');
-    localStorage.removeItem('bonds_account_type');
-    localStorage.removeItem('token');
   };
 
   const value: AuthContextType = {

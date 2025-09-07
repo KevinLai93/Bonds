@@ -87,7 +87,7 @@ interface EditableCardData {
   transactionAmount: string;
   totalSettlement: string;
   remainingYears: string;
-  tradeDirection: string; // 買賣方向
+  tradeDirection: string; // 客戶需求
 
   // 三大評等
   spRating: string;
@@ -175,24 +175,10 @@ const CardEditor = () => {
   console.log('CardEditor - searchedBond:', searchedBond);
   console.log('CardEditor - final bond:', bond);
   
-  // 如果沒有找到債券資料，嘗試搜尋
-  useEffect(() => {
-    if (!bond && isin && isin !== searchedBond?.isin && isin !== extendedBond?.isin) {
-      console.log('CardEditor - 沒有找到債券資料，開始搜尋:', isin);
-      searchByISIN(isin);
-    }
-  }, [bond, isin, searchedBond?.isin, extendedBond?.isin, searchByISIN]);
 
-  // 如果沒有債券資料且正在搜尋，顯示載入狀態
+  // 如果沒有債券資料，跳轉到查詢頁面
   if (!bond && isin) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">載入債券資料中...</p>
-        </div>
-      </div>
-    );
+    return <Navigate to="/search" replace />;
   }
 
   // 當 isin 改變時，重置初始化狀態
@@ -286,7 +272,7 @@ const CardEditor = () => {
         couponType: bond?.couponType || '固定',
         minAmount: bond.minDenomination?.toString() || '',
         minIncrement: bond.minIncrement?.toString() || '10000',
-        accruedInterest: bond.accruedInterest?.toString() || '',
+        accruedInterest: bond.accruedInterest?.toString() || '0.00',
         issueDate: bond.issueDate || '',
         maturityDate: bond.maturityDate || '',
         lastCouponDate: bond.previousCouponDate || '',
@@ -298,7 +284,12 @@ const CardEditor = () => {
         tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
         quantity: '30000.00',
         transactionAmount: '1000000.00',
-        totalSettlement: '1000000.00',
+        totalSettlement: (() => {
+          const transactionAmount = 1000000.00;
+          const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
+          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
+          return (transactionAmount + accruedInterest).toFixed(2);
+        })(),
         remainingYears: bond.remainingYears?.toString() || '',
         tradeDirection: '買',
         spRating: bond.spRating || '',
@@ -477,9 +468,13 @@ const CardEditor = () => {
         const qty = parseFloat(field === 'quantity' ? value as string : prev.quantity);
         
         if (!isNaN(price) && !isNaN(qty) && price > 0 && qty > 0) {
-          const transactionAmount = (price * qty).toFixed(2);
+          const transactionAmount = ((price / 100) * qty).toFixed(2);
           newData.transactionAmount = transactionAmount;
-          newData.totalSettlement = transactionAmount; // 總交割金額暫時等於交易金額
+          
+          // 計算前手息：交易金額/10000*前手息（每一萬面額）
+          const accruedInterestPer10k = parseFloat(prev.accruedInterest) || 0;
+          const accruedInterest = (parseFloat(transactionAmount) / 10000 * accruedInterestPer10k).toFixed(2);
+          newData.totalSettlement = (parseFloat(transactionAmount) + parseFloat(accruedInterest)).toFixed(2);
           
           // 驗證交易金額
           const amount = parseFloat(transactionAmount);
@@ -501,9 +496,13 @@ const CardEditor = () => {
         const transactionAmount = parseFloat(value as string);
         
         if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
-          const calculatedQuantity = (transactionAmount / price).toFixed(2);
+          const calculatedQuantity = (transactionAmount / (price / 100)).toFixed(2);
           newData.quantity = calculatedQuantity;
-          newData.totalSettlement = transactionAmount.toFixed(2); // 總交割金額等於交易金額
+          
+          // 計算前手息：交易金額/10000*前手息（每一萬面額）
+          const accruedInterestPer10k = parseFloat(prev.accruedInterest) || 0;
+          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k).toFixed(2);
+          newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
           
           // 驗證交易金額
           const minAmount = parseFloat(prev.minAmount) || 0;
@@ -515,6 +514,17 @@ const CardEditor = () => {
               errors.forEach(error => toast.warning(error));
             }
           }
+        }
+      }
+      
+      // 當前手息（每一萬面額）改變時，重新計算總交割金額
+      if (field === 'accruedInterest') {
+        const transactionAmount = parseFloat(prev.transactionAmount) || 0;
+        const accruedInterestPer10k = parseFloat(value as string) || 0;
+        
+        if (transactionAmount > 0) {
+          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k).toFixed(2);
+          newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
         }
       }
       
@@ -1389,6 +1399,7 @@ return (
                   </div>
                 </div>
 
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="issuer">債券發行人</Label>
@@ -1509,7 +1520,9 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="accruedInterest" className="flex items-center justify-between">
-                      前手息（每一萬面額）
+                      <div className="flex items-center gap-1">
+                        前手息（每一萬面額）
+                      </div>
                       {!editingFields.has('accruedInterest') && (
                         <Button
                           variant="ghost"
@@ -1549,7 +1562,13 @@ return (
                         </Button>
                       </div>
                     ) : (
-                      <Input id="accruedInterest" type="number" step="0.01" value={cardData.accruedInterest} readOnly className="bg-gray-50" />
+                      <Input 
+                        id="accruedInterest" 
+                        type="text" 
+                        value={formatNumber(cardData.accruedInterest)} 
+                        readOnly 
+                        className="bg-gray-50"
+                      />
                     )}
                   </div>
                 </div>
@@ -1602,7 +1621,7 @@ return (
               <CardContent className="space-y-4 pt-4">
                 {/* 買賣方向選擇 */}
                 <div className="mb-4">
-                  <Label htmlFor="tradeDirection">交易方向</Label>
+                  <Label htmlFor="tradeDirection">客戶需求</Label>
                   <Select value={cardData.tradeDirection} onValueChange={handleTradeDirectionChange}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -1804,7 +1823,7 @@ return (
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="transactionAmount" className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
@@ -1893,6 +1912,16 @@ return (
                         </div>
                       ) : null;
                     })()}
+                  </div>
+                  <div>
+                    <Label htmlFor="accruedInterest">前手息</Label>
+                    <Input 
+                      id="accruedInterest" 
+                      type="text" 
+                      value={formatNumber((parseFloat(cardData.transactionAmount) || 0) / 10000 * (parseFloat(cardData.accruedInterest) || 0))} 
+                      readOnly 
+                      className="bg-gray-50 text-gray-500"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="totalSettlement">總交割金額</Label>
