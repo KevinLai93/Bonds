@@ -44,14 +44,14 @@ const formatNumber = (value: string | number): string => {
 export const PX_A4_300 = { w: 2480, h: 3508 }; // 210/25.4*300, 297/25.4*300
 export const PX_A4_150 = { w: 1240, h: 1754 }; // 210/25.4*150, 297/25.4*150
 
-// === 債券資料查詢（優先使用 API 結果，否則使用樣本資料） ===
+// === 債券資料查詢（只使用 API 結果，不使用樣本資料） ===
 const getBondByIsin = (isin: string, searchedBond: Bond | ExtendedBond | null): Bond | ExtendedBond | null => {
-  // 如果搜尋結果的 ISIN 匹配，使用 API 資料
+  // 只返回 API 搜尋結果，不使用樣本資料
   if (searchedBond && searchedBond.isin === isin) {
     return searchedBond;
   }
-  // 否則檢查是否為樣本資料
-  return sampleBond.isin === isin ? sampleBond : null;
+  // 沒有 API 資料時返回 null
+  return null;
 };
 
 interface EditableCardData {
