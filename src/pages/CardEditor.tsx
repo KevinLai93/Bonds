@@ -175,15 +175,141 @@ const CardEditor = () => {
   console.log('CardEditor - searchedBond:', searchedBond);
   console.log('CardEditor - final bond:', bond);
   
+  // 編輯資料（根據債券資料初始化）
+  const [cardData, setCardData] = useState<EditableCardData | null>(() => {
+    // 確保有債券資料且 ISIN 匹配才初始化
+    if (bond && bond.isin === isin) {
+      return {
+        logoText: 'EUF BondDesk Pro',
+        mainTitle: bond.name || '債券投資機會',
+        subtitle: '專業債券投資服務',
+        productName: bond.name || '',
+        isin: bond.isin || '',
+        currency: bond.currency || '',
+        investorType: ['一般'],
+        couponRate: bond.couponRate?.toString() || '',
+        couponType: bond?.couponType || '固定',
+        minAmount: bond.minDenomination?.toString() || '',
+        minIncrement: bond.minIncrement?.toString() || '10000',
+        accruedInterest: bond.accruedInterest?.toString() || '0.00',
+        issueDate: bond.issueDate || '',
+        maturityDate: bond.maturityDate || '',
+        lastCouponDate: bond.previousCouponDate || '',
+        nextCouponDate: bond.nextCouponDate || '',
+        nextCallDate: '',
+        bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
+        ytm: '',
+        askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
+        tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
+        quantity: '30000.00',
+        transactionAmount: '1000000.00',
+        totalSettlement: (() => {
+          const transactionAmount = 1000000.00;
+          const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
+          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
+          return (transactionAmount + accruedInterest).toFixed(2);
+        })(),
+        remainingYears: bond.remainingYears?.toString() || '',
+        tradeDirection: '買',
+        spRating: bond.spRating || '',
+        moodyRating: bond.moodyRating || '',
+        fitchRating: bond.fitchRating || '',
+        seniorityRank: bond.seniority_text || bond.seniority || '',
+        maturityType: '到期償還',
+        paymentFrequency: bond.paymentFrequency || '',
+        issuer: bond.issuer || '',
+        industry: bond.industry || '',
+        country: bond.country || '',
+        parentCode: '',
+        issuerDescription: bond.issuerDescription || '',
+        issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
+        riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
+        defaultProbability: bond.defaultProbability1Y?.toString() || '0.0000',
+        outstandingAmount: bond.outstandingAmount?.toString() || '',
+        tlacMrel: bond.tlacMrel || false
+      };
+    }
+    // 沒有債券資料時返回 null
+    return null;
+  });
+
   // 如果沒有債券資料，跳轉到查詢頁面
   if (!bond && isin) {
     return <Navigate to="/search" replace />;
+  }
+
+  // 如果沒有 cardData，顯示載入狀態
+  if (!cardData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">載入債券資料中...</p>
+        </div>
+      </div>
+    );
   }
 
   // 當 isin 改變時，重置初始化狀態
   useEffect(() => {
     setIsInitialized(false);
   }, [isin]);
+
+  // 當債券資料加載完成後，初始化 cardData
+  useEffect(() => {
+    if (bond && bond.isin === isin && !cardData) {
+      console.log('CardEditor - 債券資料已加載，初始化 cardData');
+      setCardData({
+        logoText: 'EUF BondDesk Pro',
+        mainTitle: bond.name || '債券投資機會',
+        subtitle: '專業債券投資服務',
+        productName: bond.name || '',
+        isin: bond.isin || '',
+        currency: bond.currency || '',
+        investorType: ['一般'],
+        couponRate: bond.couponRate?.toString() || '',
+        couponType: bond?.couponType || '固定',
+        minAmount: bond.minDenomination?.toString() || '',
+        minIncrement: bond.minIncrement?.toString() || '10000',
+        accruedInterest: bond.accruedInterest?.toString() || '0.00',
+        issueDate: bond.issueDate || '',
+        maturityDate: bond.maturityDate || '',
+        lastCouponDate: bond.previousCouponDate || '',
+        nextCouponDate: bond.nextCouponDate || '',
+        nextCallDate: '',
+        bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
+        ytm: '',
+        askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
+        tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
+        quantity: '30000.00',
+        transactionAmount: '1000000.00',
+        totalSettlement: (() => {
+          const transactionAmount = 1000000.00;
+          const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
+          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
+          return (transactionAmount + accruedInterest).toFixed(2);
+        })(),
+        remainingYears: bond.remainingYears?.toString() || '',
+        tradeDirection: '買',
+        spRating: bond.spRating || '',
+        moodyRating: bond.moodyRating || '',
+        fitchRating: bond.fitchRating || '',
+        seniorityRank: bond.seniority_text || bond.seniority || '',
+        maturityType: '到期償還',
+        paymentFrequency: bond.paymentFrequency || '',
+        issuer: bond.issuer || '',
+        industry: bond.industry || '',
+        country: bond.country || '',
+        parentCode: '',
+        issuerDescription: bond.issuerDescription || '',
+        issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
+        riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
+        defaultProbability: bond.defaultProbability1Y?.toString() || '0.0000',
+        outstandingAmount: bond.outstandingAmount?.toString() || '',
+        tlacMrel: bond.tlacMrel || false
+      });
+    }
+  }, [bond, isin, cardData]);
 
   // 當 extendedBond 數據加載完成後，重新初始化 cardData
   useEffect(() => {
@@ -192,10 +318,12 @@ const CardEditor = () => {
       extendedBondIsin: extendedBond?.isin,
       currentIsin: isin,
       isInitialized: isInitialized,
-      yieldToMaturity: extendedBond?.yieldToMaturity
+      yieldToMaturity: extendedBond?.yieldToMaturity,
+      hasBond: !!bond
     });
     
-    if (extendedBond && extendedBond.isin === isin && !isInitialized) {
+    // 只有在有債券資料且 extendedBond 匹配且未初始化時才更新
+    if (bond && extendedBond && extendedBond.isin === isin && !isInitialized) {
       console.log('CardEditor - extendedBond 數據已加載，重新初始化 cardData');
       
       // 計算 YTM - 檢查是否需要轉換
@@ -250,76 +378,6 @@ const CardEditor = () => {
       setIsInitialized(true);
     }
   }, [extendedBond, isin]);
-  
-  // 編輯資料（根據債券資料初始化）
-  const [cardData, setCardData] = useState<EditableCardData | null>(() => {
-    // 確保有債券資料才初始化
-    if (bond) {
-      return {
-        logoText: 'EUF BondDesk Pro',
-        mainTitle: bond.name || '債券投資機會',
-        subtitle: '專業債券投資服務',
-        productName: bond.name || '',
-        isin: bond.isin || '',
-        currency: bond.currency || '',
-        investorType: ['一般'],
-        couponRate: bond.couponRate?.toString() || '',
-        couponType: bond?.couponType || '固定',
-        minAmount: bond.minDenomination?.toString() || '',
-        minIncrement: bond.minIncrement?.toString() || '10000',
-        accruedInterest: bond.accruedInterest?.toString() || '0.00',
-        issueDate: bond.issueDate || '',
-        maturityDate: bond.maturityDate || '',
-        lastCouponDate: bond.previousCouponDate || '',
-        nextCouponDate: bond.nextCouponDate || '',
-        nextCallDate: '',
-        bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
-        ytm: '',
-        askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
-        tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
-        quantity: '30000.00',
-        transactionAmount: '1000000.00',
-        totalSettlement: (() => {
-          const transactionAmount = 1000000.00;
-          const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
-          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
-          return (transactionAmount + accruedInterest).toFixed(2);
-        })(),
-        remainingYears: bond.remainingYears?.toString() || '',
-        tradeDirection: '買',
-        spRating: bond.spRating || '',
-        moodyRating: bond.moodyRating || '',
-        fitchRating: bond.fitchRating || '',
-        seniorityRank: bond.seniority_text || bond.seniority || '',
-        maturityType: '到期償還',
-        paymentFrequency: bond.paymentFrequency || '',
-        issuer: bond.issuer || '',
-        industry: bond.industry || '',
-        country: bond.country || '',
-        parentCode: '',
-        issuerDescription: bond.issuerDescription || '',
-        issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
-        riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
-        defaultProbability: '0.0000',
-        outstandingAmount: bond.outstandingAmount?.toString() || '',
-        tlacMrel: false
-      };
-    }
-    // 沒有債券資料時返回 null
-    return null;
-  });
-
-  // 如果沒有 cardData，顯示載入狀態
-  if (!cardData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">載入債券資料中...</p>
-        </div>
-      </div>
-    );
-  }
 
   // 當債券資料更新時，更新編輯資料
   useEffect(() => {
