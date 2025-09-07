@@ -175,7 +175,6 @@ const CardEditor = () => {
   console.log('CardEditor - searchedBond:', searchedBond);
   console.log('CardEditor - final bond:', bond);
   
-
   // 如果沒有債券資料，跳轉到查詢頁面
   if (!bond && isin) {
     return <Navigate to="/search" replace />;
@@ -252,13 +251,9 @@ const CardEditor = () => {
     }
   }, [extendedBond, isin]);
   
-  // 如果沒有債券資料且不是載入中，返回搜尋頁面
-  if (!bond && searchedBond?.isin !== isin) {
-    return <Navigate to="/search" replace />;
-  }
-
   // 編輯資料（根據債券資料初始化）
-  const [cardData, setCardData] = useState<EditableCardData>(() => {
+  const [cardData, setCardData] = useState<EditableCardData | null>(() => {
+    // 確保有債券資料才初始化
     if (bond) {
       return {
         logoText: 'EUF BondDesk Pro',
@@ -310,52 +305,21 @@ const CardEditor = () => {
         tlacMrel: false
       };
     }
-    // 預設資料
-    return {
-      logoText: 'EUF BondDesk Pro',
-      mainTitle: '債券投資機會',
-      subtitle: '專業債券投資服務',
-      productName: '',
-      isin: isin || '',
-      currency: 'USD',
-      investorType: ['一般'],
-      couponRate: '',
-      couponType: '固定',
-      minAmount: '',
-      minIncrement: '10000',
-      accruedInterest: '',
-      issueDate: '',
-      maturityDate: '',
-      lastCouponDate: '',
-      nextCouponDate: '',
-      nextCallDate: '',
-      bidPrice: '',
-      ytm: '',
-      askPrice: '',
-      tradingPrice: '',
-      quantity: '30000.00',
-      transactionAmount: '',
-      totalSettlement: '',
-      remainingYears: '',
-      tradeDirection: '買',
-      spRating: '',
-      moodyRating: '',
-      fitchRating: '',
-      seniorityRank: '',
-      maturityType: '到期償還',
-      paymentFrequency: '',
-      issuer: '',
-      industry: '',
-      country: '',
-      parentCode: '',
-      issuerDescription: '',
-      issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
-      riskNotes: '匯率風險、利率風險、信用風險',
-      defaultProbability: '0.0000',
-      outstandingAmount: '',
-      tlacMrel: false
-    };
+    // 沒有債券資料時返回 null
+    return null;
   });
+
+  // 如果沒有 cardData，顯示載入狀態
+  if (!cardData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">載入債券資料中...</p>
+        </div>
+      </div>
+    );
+  }
 
   // 當債券資料更新時，更新編輯資料
   useEffect(() => {
