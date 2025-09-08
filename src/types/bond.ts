@@ -13,14 +13,14 @@ export interface Bond {
   country: string; // 國家
   
   // Duration & Maturity
-  remainingYears: number; // 剩餘年期_年
+  remainingYears: number | null; // 剩餘年期_年 (永續債券為 null)
   issueDate: string; // 發行日
   maturityDate: string; // 到期日
   maturityType: '到期償還' | '可提前贖回' | '永續' | '其他';
   
   // Coupon & Interest
   couponRate: number; // 票面利率_%
-  couponType: '固定' | '浮動' | '零息' | '階梯' | '其他';
+  couponType: '固定' | '浮動' | '零息' | '變動' | '其他';
   paymentFrequency: '每年' | '每半年' | '每季' | '每月' | '不配';
   previousCouponDate?: string; // 上一配息日
   nextCouponDate?: string; // 下一配息日
@@ -221,7 +221,7 @@ export const sampleBond: Bond = {
 export const filterOptions = {
   currencies: ['USD', 'EUR', 'JPY', 'TWD', 'CNY', 'GBP', 'AUD', 'CAD', 'CHF', 'HKD'],
   ratings: ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-', 'BBB+', 'BBB', 'BBB-', 'BB+', 'BB', 'BB-', 'B+', 'B', 'B-', 'CCC+', 'CCC', 'CCC-', 'CC', 'C', 'D'],
-  couponTypes: ['固定', '浮動', '零息', '階梯', '其他'],
+  couponTypes: ['固定', '浮動', '零息', '變動', '其他'],
   paymentFrequencies: ['每年', '每半年', '每季', '每月', '不配'],
   seniorities: ['優先無擔保', '優先有擔保', '次順位', '永續'],
   maturityTypes: ['到期償還', '可提前贖回', '永續', '其他'],

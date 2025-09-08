@@ -478,7 +478,8 @@ const CardEditor = () => {
       if (d2 === 31 && d1 < 30) d2 = 30;
       if (d2 === 31 && d1 === 30) d2 = 30;
       
-      const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+      // 計算天數時 +1，因為要包含當日利息
+      const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1) + 1;
       const periodsPerYear = frequency;
       const daysInPeriod = 360 / periodsPerYear;
       
@@ -1511,7 +1512,7 @@ return (
                         <SelectItem value="固定">固定</SelectItem>
                         <SelectItem value="浮動">浮動</SelectItem>
                         <SelectItem value="零息">零息</SelectItem>
-                        <SelectItem value="階梯">階梯</SelectItem>
+                        <SelectItem value="變動">變動</SelectItem>
                         <SelectItem value="其他">其他</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1621,7 +1622,13 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="remainingYears">剩餘年期</Label>
-                    <Input id="remainingYears" type="number" step="0.01" value={cardData.remainingYears} readOnly className="bg-gray-50 text-gray-500" />
+                    <Input 
+                      id="remainingYears" 
+                      type="text" 
+                      value={cardData.remainingYears === '' || cardData.remainingYears === 'null' ? '永續' : cardData.remainingYears} 
+                      readOnly 
+                      className="bg-gray-50 text-gray-500" 
+                    />
                   </div>
                 </div>
 
@@ -1699,7 +1706,13 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="maturityDate">到期日</Label>
-                    <Input id="maturityDate" type="date" value={cardData.maturityDate.split('/').reverse().join('-')} readOnly className="bg-gray-50 text-gray-500" />
+                    <Input 
+                      id="maturityDate" 
+                      type="text" 
+                      value={cardData.maturityDate === '' || cardData.maturityDate === 'null' ? '永續' : cardData.maturityDate} 
+                      readOnly 
+                      className="bg-gray-50 text-gray-500" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="nextCouponDate">下一配息日</Label>
@@ -1726,7 +1739,9 @@ return (
                   <div className="ml-auto flex items-center space-x-2">
                     {!openAccordions.includes('pricing') && (
                       <div className="flex space-x-1">
-                        <Badge variant="secondary" className="text-xs">YTM {cardData.ytm}%</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          YTM {cardData.maturityType === '永續' ? 'N/A' : `${cardData.ytm}%`}
+                        </Badge>
                         <Badge variant="secondary" className="text-xs">${cardData.tradingPrice}</Badge>
                       </div>
                     )}

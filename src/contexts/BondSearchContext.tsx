@@ -191,8 +191,17 @@ function extractTickerFromName(bondName: string): string {
   return '';
 }
 
-function computeTenorYears(maturityDate: string): number {
+function computeTenorYears(maturityDate: string): number | null {
+  // 永續債券的 maturity_date 為 null 或空字符串
+  if (!maturityDate || maturityDate === 'null' || maturityDate === '') {
+    return null; // 返回 null 表示永續債券
+  }
+  
   const maturity = new Date(maturityDate);
+  if (isNaN(maturity.getTime())) {
+    return null; // 無效日期也返回 null
+  }
+  
   const now = new Date();
   const diffTime = maturity.getTime() - now.getTime();
   const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
@@ -396,7 +405,8 @@ function calculateDays360US(startDate: Date, endDate: Date): number {
   if (d1 === 31) d1 = 30;
   if (d2 === 31 && d1 === 30) d2 = 30;
   
-  return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+  // 計算天數時 +1，因為要包含當日利息
+  return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1) + 1;
 }
 
 // 獲取最新的有效價格資料
@@ -616,6 +626,14 @@ function mapEmissionToBond(emission: any, emitentInfo?: any): Bond {
   const tenorYears = computeTenorYears(emission.maturity_date);
   const seniorityMapping = mapSeniority(emission.bond_rank_name_eng || emission.bond_rank_name || emission.bond_rank);
   
+  // 判斷是否為永續債券
+  const isPerpetual = !emission.maturity_date || 
+                     emission.maturity_date === 'null' || 
+                     emission.maturity_date === '' ||
+                     seniorityMapping.seniority_text === '永續' ||
+                     emission.bond_rank_name_eng?.toLowerCase().includes('perpetual') ||
+                     emission.bond_rank_name_eng?.toLowerCase().includes('perp');
+  
   // 獲取最小承作面額
   const minDenomination = parseFloat(emission.eurobonds_nominal || emission.integral_multiple || '10000');
   
@@ -633,16 +651,39 @@ function mapEmissionToBond(emission: any, emitentInfo?: any): Bond {
     country: emission.emitent_country_name_zh || emission.emitent_country_name_eng || '',
     remainingYears: tenorYears,
     issueDate: emission.settlement_date || '',
-    maturityDate: emission.maturity_date || '',
-    maturityType: '到期償還',
+    maturityDate: isPerpetual ? '' : (emission.maturity_date || ''),
+    maturityType: isPerpetual ? '永續' : '到期償還',
     couponRate: parseFloat(emission.emission_coupon_rate || emission.curr_coupon_rate || '0'),
     couponType: (() => {
-      console.log('API coupon_type_name_eng:', emission.coupon_type_name_eng);
-      if (emission.coupon_type_name_eng === 'Fixed') return '固定';
-      if (emission.coupon_type_name_eng === 'Floating') return '浮動';
-      if (emission.coupon_type_name_eng === 'Zero') return '零息';
-      if (emission.coupon_type_name_eng === 'Step') return '階梯';
-      return '其他';
+      const couponString = emission.cupon_eng || '';
+      const floatingRate = emission.floating_rate;
+      
+      console.log('API 票息類型判斷:', {
+        coupon_type_name_eng: emission.coupon_type_name_eng,
+        cupon_eng: couponString,
+        floating_rate: floatingRate
+      });
+      
+      // 零息債券
+      if (!couponString || couponString === "0%" || emission.coupon_type_name_eng === "Zero coupon") {
+        return '零息';
+      }
+      
+      // 變動利率（分階段、混合型）
+      if (couponString.includes("until") && couponString.includes("then")) {
+        return '變動';
+      }
+      
+      // 浮動利率
+      if (floatingRate === "1" || 
+          couponString.includes("ust yield") || 
+          couponString.includes("libor") || 
+          couponString.includes("sofr")) {
+        return '浮動';
+      }
+      
+      // 固定利率
+      return '固定';
     })(),
     paymentFrequency: couponFreqText(emission.cupon_period) as any,
     previousCouponDate: schedule.previousCouponDate,

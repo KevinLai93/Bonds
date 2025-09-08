@@ -61,7 +61,8 @@ const AccruedInterestDebug: React.FC = () => {
     if (d2 === 31 && d1 < 30) d2 = 30;
     if (d2 === 31 && d1 === 30) d2 = 30;
 
-    return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+    // 計算天數時 +1，因為要包含當日利息
+    return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1) + 1;
   };
 
   // 計算前手息

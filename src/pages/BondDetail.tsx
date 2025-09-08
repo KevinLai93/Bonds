@@ -54,7 +54,10 @@ const BondDetail = () => {
     if (!bond || bond.couponRate <= 0) return bond.accruedInterest || 0;
     
     const today = new Date();
-    const maturity = new Date(bond.maturityDate);
+    // 永續債券沒有到期日，使用一個很遠的未來日期
+    const maturity = bond.maturityType === '永續' 
+      ? new Date('2099-12-31') 
+      : new Date(bond.maturityDate);
     const frequency = bond.paymentFrequency === '每年' ? 1 : 
                      bond.paymentFrequency === '每半年' ? 2 :
                      bond.paymentFrequency === '每季' ? 4 :
@@ -124,7 +127,8 @@ const BondDetail = () => {
     if (d2 === 31 && d1 === 30) d2 = 30;
     if (d2 === 31 && d1 < 30) d2 = 30;
     
-    const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+    // 計算天數時 +1，因為要包含當日利息
+    const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1) + 1;
     const periodsPerYear = frequency;
     const daysInPeriod = 360 / periodsPerYear;
     const baseAmount = bond.minDenomination || 10000;
@@ -206,7 +210,9 @@ const BondDetail = () => {
     const annualCoupon = (investmentAmount * couponRate) / 100;
     
     const issueDate = new Date(displayBond.issueDate);
-    const maturityDate = new Date(displayBond.maturityDate);
+    const maturityDate = displayBond.maturityType === '永續' 
+      ? null 
+      : new Date(displayBond.maturityDate);
     const nextCouponDate = new Date(displayBond.nextCouponDate);
     
     const couponSchedule = [];
@@ -238,7 +244,11 @@ const BondDetail = () => {
     // 從下一個配息日開始計算
     const currentDate = new Date(nextCouponDate);
     
-    while (currentDate <= maturityDate) {
+    // 永續債券只顯示前10次配息
+    const maxPayments = displayBond.maturityType === '永續' ? 10 : Infinity;
+    let paymentCount = 0;
+    
+    while ((!maturityDate || currentDate <= maturityDate) && paymentCount < maxPayments) {
       couponSchedule.push({
         配息日期: currentDate.toLocaleDateString('zh-TW'),
         配息金額: couponAmount.toLocaleString('zh-TW', {
@@ -259,6 +269,7 @@ const BondDetail = () => {
       
       // 根據配息頻率增加時間間隔
       currentDate.setMonth(currentDate.getMonth() + monthsInterval);
+      paymentCount++;
     }
     
     return couponSchedule;
@@ -289,7 +300,7 @@ const BondDetail = () => {
         ['債券名稱', displayBond.name],
         ['ISIN', displayBond.isin],
         ['發行日', displayBond.issueDate],
-        ['到期日', displayBond.maturityDate],
+        ['到期日', displayBond.maturityType === '永續' ? '永續' : displayBond.maturityDate],
         ['票息率', `${displayBond.couponRate}%`],
         ['投資金額', `1,000,000 ${displayBond.currency || 'USD'}`],
         [''],
@@ -532,7 +543,9 @@ const BondDetail = () => {
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">YTM</p>
                   <p className="text-2xl font-bold text-success">
-                    {(displayBond.yieldToMaturity * 100).toFixed(2)}%
+                    {displayBond.maturityType === '永續' 
+                      ? 'N/A' 
+                      : `${(displayBond.yieldToMaturity * 100).toFixed(2)}%`}
                   </p>
                 </div>
                 <div className="text-center">
@@ -603,7 +616,11 @@ const BondDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">剩餘年期</p>
-                  <p className="font-medium">{displayBond.remainingYears.toFixed(1)} 年</p>
+                  <p className="font-medium">
+                    {displayBond.remainingYears !== null 
+                      ? `${displayBond.remainingYears.toFixed(1)} 年` 
+                      : '永續'}
+                  </p>
                 </div>
               </div>
               
@@ -648,7 +665,9 @@ const BondDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">到期日</p>
-                  <p className="font-medium">{formatDate(displayBond.maturityDate)}</p>
+                  <p className="font-medium">
+                    {displayBond.maturityType === '永續' ? '永續' : formatDate(displayBond.maturityDate)}
+                  </p>
                 </div>
               </div>
               

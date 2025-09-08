@@ -265,7 +265,11 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
                   verticalAlign: 'middle',
                   textAlign: 'center',
                   display: 'inline-block'
-                }}>{typeof bond.yieldToMaturity === 'number' ? (bond.yieldToMaturity * 100).toFixed(2) : bond.yieldToMaturity}%</span>
+                }}>
+                  {bond.maturityType === '永續' 
+                    ? 'N/A' 
+                    : `${typeof bond.yieldToMaturity === 'number' ? (bond.yieldToMaturity * 100).toFixed(2) : bond.yieldToMaturity}%`}
+                </span>
               </div>
               <p className="text-sm font-medium" style={{ color: '#333333' }}>到期殖利率</p>
             </div>

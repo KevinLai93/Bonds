@@ -410,10 +410,11 @@ function renderCellValue(bond: Bond, column: string): React.ReactNode {
       // 顯示實際的買賣價格
       return value && (value as number) > 0 ? (value as number).toFixed(2) : '—';
     case 'remainingYears':
-      return `${(value as number).toFixed(1)} 年`;
+      return value !== null ? `${(value as number).toFixed(1)} 年` : '永續';
     case 'currency':
       return <Badge variant="outline">{value as string}</Badge>;
     case 'maturityDate':
+      return value && value !== '' ? new Date(value as string).toLocaleDateString('zh-TW') : '永續';
     case 'nextCouponDate':
     case 'previousCouponDate':
       return value ? new Date(value as string).toLocaleDateString('zh-TW') : '-';
