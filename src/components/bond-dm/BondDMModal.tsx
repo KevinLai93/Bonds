@@ -11,13 +11,15 @@ interface BondDMModalProps {
   isOpen: boolean;
   onClose: () => void;
   transactionAmount?: number; // 交易金額
+  tradeDirection?: string; // 客戶需求：買/賣
 }
 
 export const BondDMModal: React.FC<BondDMModalProps> = ({ 
   bond, 
   isOpen, 
   onClose,
-  transactionAmount 
+  transactionAmount,
+  tradeDirection 
 }) => {
   const dmRef = useRef<HTMLDivElement>(null);
 
@@ -296,7 +298,7 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
         {/* Content */}
         <div className="p-6 overflow-auto max-h-[calc(90vh-80px)]">
           <div ref={dmRef}>
-            <OriginalBondDM bond={bond} isPreview={true} transactionAmount={transactionAmount} />
+            <OriginalBondDM bond={bond} isPreview={true} transactionAmount={transactionAmount} tradeDirection={tradeDirection} />
           </div>
         </div>
       </div>

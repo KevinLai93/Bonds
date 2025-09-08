@@ -182,52 +182,59 @@ const CardEditor = () => {
 
   // 編輯資料（根據債券資料初始化）
   const [cardData, setCardData] = useState<EditableCardData>(() => ({
-    logoText: 'EUF BondDesk Pro',
-    mainTitle: bond.name || '債券投資機會',
-    subtitle: '專業債券投資服務',
-    productName: bond.name || '',
-    isin: bond.isin || '',
-    currency: bond.currency || '',
-    investorType: ['一般'],
-    couponRate: bond.couponRate?.toString() || '',
+        logoText: 'EUF BondDesk Pro',
+        mainTitle: bond.name || '債券投資機會',
+        subtitle: '專業債券投資服務',
+        productName: bond.name || '',
+        isin: bond.isin || '',
+        currency: bond.currency || '',
+        investorType: ['一般'],
+        couponRate: bond.couponRate?.toString() || '',
     couponType: bond?.couponType || '固定',
-    minAmount: bond.minDenomination?.toString() || '',
+        minAmount: bond.minDenomination?.toString() || '',
     minIncrement: bond.minIncrement?.toString() || '10000',
     accruedInterest: bond.accruedInterest?.toString() || '0.00',
-    issueDate: bond.issueDate || '',
-    maturityDate: bond.maturityDate || '',
-    lastCouponDate: bond.previousCouponDate || '',
-    nextCouponDate: bond.nextCouponDate || '',
-    nextCallDate: '',
+        issueDate: bond.issueDate || '',
+        maturityDate: bond.maturityDate || '',
+        lastCouponDate: bond.previousCouponDate || '',
+        nextCouponDate: bond.nextCouponDate || '',
+        nextCallDate: '',
     bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
     ytm: '',
     askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
     tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
-    quantity: '30000.00',
-    transactionAmount: '1000000.00',
+        quantity: '30000.00',
+    transactionAmount: (() => {
+      const quantity = 30000;
+      const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
+      return ((price / 100) * quantity).toFixed(2);
+    })(),
     totalSettlement: (() => {
-      const transactionAmount = 1000000.00;
-      const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
-      const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
+      const quantity = 30000;
+      const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
+      const transactionAmount = (price / 100) * quantity;
+      const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
+      const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
+      const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
       return (transactionAmount + accruedInterest).toFixed(2);
     })(),
-    remainingYears: bond.remainingYears?.toString() || '',
+        remainingYears: bond.remainingYears?.toString() || '',
     tradeDirection: '買',
-    spRating: bond.spRating || '',
-    moodyRating: bond.moodyRating || '',
-    fitchRating: bond.fitchRating || '',
-    seniorityRank: bond.seniority_text || bond.seniority || '',
-    maturityType: '到期償還',
-    paymentFrequency: bond.paymentFrequency || '',
-    issuer: bond.issuer || '',
-    industry: bond.industry || '',
-    country: bond.country || '',
-    parentCode: '',
-    issuerDescription: bond.issuerDescription || '',
-    issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
-    riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
+        spRating: bond.spRating || '',
+        moodyRating: bond.moodyRating || '',
+        fitchRating: bond.fitchRating || '',
+        seniorityRank: bond.seniority_text || bond.seniority || '',
+        maturityType: '到期償還',
+        paymentFrequency: bond.paymentFrequency || '',
+        issuer: bond.issuer || '',
+        industry: bond.industry || '',
+        country: bond.country || '',
+        parentCode: '',
+        issuerDescription: bond.issuerDescription || '',
+        issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
+        riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
     defaultProbability: bond.defaultProbability1Y?.toString() || '0.0000',
-    outstandingAmount: bond.outstandingAmount?.toString() || '',
+        outstandingAmount: bond.outstandingAmount?.toString() || '',
     tlacMrel: bond.tlacMrel || false
   }));
 
@@ -241,13 +248,13 @@ const CardEditor = () => {
     if (bond && bond.isin === isin && !cardData) {
       console.log('CardEditor - 債券資料已加載，初始化 cardData');
       setCardData({
-        logoText: 'EUF BondDesk Pro',
+      logoText: 'EUF BondDesk Pro',
         mainTitle: bond.name || '債券投資機會',
-        subtitle: '專業債券投資服務',
+      subtitle: '專業債券投資服務',
         productName: bond.name || '',
         isin: bond.isin || '',
         currency: bond.currency || '',
-        investorType: ['一般'],
+      investorType: ['一般'],
         couponRate: bond.couponRate?.toString() || '',
         couponType: bond?.couponType || '固定',
         minAmount: bond.minDenomination?.toString() || '',
@@ -257,17 +264,24 @@ const CardEditor = () => {
         maturityDate: bond.maturityDate || '',
         lastCouponDate: bond.previousCouponDate || '',
         nextCouponDate: bond.nextCouponDate || '',
-        nextCallDate: '',
+      nextCallDate: '',
         bidPrice: bond.bidPrice && bond.bidPrice > 0 ? bond.bidPrice.toString() : '',
-        ytm: '',
+      ytm: '',
         askPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '',
         tradingPrice: bond.askPrice && bond.askPrice > 0 ? bond.askPrice.toString() : '', // 預設使用買價
-        quantity: '30000.00',
-        transactionAmount: '1000000.00',
+      quantity: '30000.00',
+        transactionAmount: (() => {
+          const quantity = 30000;
+          const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
+          return ((price / 100) * quantity).toFixed(2);
+        })(),
         totalSettlement: (() => {
-          const transactionAmount = 1000000.00;
-          const accruedInterestPer10k = parseFloat(bond.accruedInterest?.toString() || '0');
-          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k);
+          const quantity = 30000;
+          const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
+          const transactionAmount = (price / 100) * quantity;
+          const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
+          const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
+          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
           return (transactionAmount + accruedInterest).toFixed(2);
         })(),
         remainingYears: bond.remainingYears?.toString() || '',
@@ -276,14 +290,14 @@ const CardEditor = () => {
         moodyRating: bond.moodyRating || '',
         fitchRating: bond.fitchRating || '',
         seniorityRank: bond.seniority_text || bond.seniority || '',
-        maturityType: '到期償還',
+      maturityType: '到期償還',
         paymentFrequency: bond.paymentFrequency || '',
         issuer: bond.issuer || '',
         industry: bond.industry || '',
         country: bond.country || '',
-        parentCode: '',
+      parentCode: '',
         issuerDescription: bond.issuerDescription || '',
-        issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
+      issuerControl: '• 嚴格的財務管控\n• 定期財務報告\n• 信用評等監控',
         riskNotes: bond.riskNotes || '匯率風險、利率風險、信用風險',
         defaultProbability: bond.defaultProbability1Y?.toString() || '0.0000',
         outstandingAmount: bond.outstandingAmount?.toString() || '',
@@ -425,43 +439,88 @@ const CardEditor = () => {
     });
   }, [cardData.ytm, cardData.couponType, cardData.bidPrice, cardData.askPrice]);
 
-  // 驗證交易金額
-  const validateTransactionAmount = useCallback((amount: number, minAmount: number, minIncrement: number) => {
+  // 驗證數量（面額）
+  const validateQuantity = useCallback((quantity: number, minAmount: number, minIncrement: number) => {
     const errors: string[] = [];
     
-    // 檢查是否小於最小承作金額
-    if (amount < minAmount) {
-      errors.push(`交易金額 ${amount.toLocaleString()} 小於最小承作金額 ${minAmount.toLocaleString()}`);
+    // 檢查是否小於最小承作面額
+    if (quantity < minAmount) {
+      errors.push(`數量 ${quantity.toLocaleString()} 小於最小承作面額 ${minAmount.toLocaleString()}`);
     }
     
-    // 檢查是否無法被最小累加金額整除
-    if (amount % minIncrement !== 0) {
-      errors.push(`最小疊加金額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
+    // 檢查是否無法被最小疊加面額整除
+    if (quantity % minIncrement !== 0) {
+      errors.push(`最小疊加面額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
     }
     
     return errors;
+  }, []);
+
+  // 重新計算前手息（基於最小承作面額）
+  const recalculateAccruedInterest = useCallback((minAmount: number, couponRate: number, frequency: number, lastCouponDate?: string) => {
+    if (couponRate === 0 || minAmount === 0) return 0;
+    
+    // 如果有上次付息日，使用30/360 US規則計算
+    if (lastCouponDate) {
+      const today = new Date();
+      const prevCoupon = new Date(lastCouponDate);
+      
+      // 30/360 US rule day count
+      let d1 = prevCoupon.getDate();
+      let d2 = today.getDate();
+      let m1 = prevCoupon.getMonth() + 1;
+      let m2 = today.getMonth() + 1;
+      let y1 = prevCoupon.getFullYear();
+      let y2 = today.getFullYear();
+      
+      if (d1 === 31) d1 = 30;
+      if (d2 === 31 && d1 === 30) d2 = 30;
+      if (d2 === 31 && d1 < 30) d2 = 30;
+      if (d2 === 31 && d1 === 30) d2 = 30;
+      
+      const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+      const periodsPerYear = frequency;
+      const daysInPeriod = 360 / periodsPerYear;
+      
+      const periodicCouponAmount = (minAmount * couponRate / 100) / periodsPerYear;
+      const accruedInterest = (days360 / daysInPeriod) * periodicCouponAmount;
+      
+      return Math.round(accruedInterest * 100) / 100;
+    }
+    
+    // 如果沒有上次付息日，使用簡化計算
+    const periodsPerYear = frequency;
+    const accruedInterest = (minAmount * couponRate / 100) / periodsPerYear;
+    
+    return Math.round(accruedInterest * 100) / 100;
   }, []);
 
   const handleInputChange = useCallback((field: keyof EditableCardData, value: string | string[] | boolean) => {
     setCardData(prev => {
       const newData = { ...prev, [field]: value as any };
       
-      // 當買價或賣價改變時，如果當前選擇的方向對應，也要更新參考價格和數量
+      // 當買價或賣價改變時，如果當前選擇的方向對應，也要更新參考價格和交易金額
       if (field === 'bidPrice' && prev.tradeDirection === '賣') {
         newData.tradingPrice = value as string;
-        // 重新計算數量
+        // 重新計算交易金額
         const price = parseFloat(value as string);
-        const transactionAmount = parseFloat(prev.transactionAmount);
-        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
-          newData.quantity = (transactionAmount / price).toFixed(2);
+        const quantity = parseFloat(prev.quantity);
+        if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
+          newData.transactionAmount = ((price / 100) * quantity).toFixed(2);
+          // 重新計算總交割金額
+          const accruedInterest = parseFloat(prev.accruedInterest) || 0;
+          newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
         }
       } else if (field === 'askPrice' && prev.tradeDirection === '買') {
         newData.tradingPrice = value as string;
-        // 重新計算數量
+        // 重新計算交易金額
         const price = parseFloat(value as string);
-        const transactionAmount = parseFloat(prev.transactionAmount);
-        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
-          newData.quantity = (transactionAmount / price).toFixed(2);
+        const quantity = parseFloat(prev.quantity);
+        if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
+          newData.transactionAmount = ((price / 100) * quantity).toFixed(2);
+          // 重新計算總交割金額
+          const accruedInterest = parseFloat(prev.accruedInterest) || 0;
+          newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
         }
       }
       
@@ -474,20 +533,23 @@ const CardEditor = () => {
           const transactionAmount = ((price / 100) * qty).toFixed(2);
           newData.transactionAmount = transactionAmount;
           
-          // 計算前手息：交易金額/10000*前手息（每一萬面額）
-          const accruedInterestPer10k = parseFloat(prev.accruedInterest) || 0;
-          const accruedInterest = (parseFloat(transactionAmount) / 10000 * accruedInterestPer10k).toFixed(2);
+          // 計算前手息：基於數量計算
+          const quantity = parseFloat(prev.quantity) || 0;
+          const minAmount = parseFloat(prev.minAmount) || 10000;
+          const accruedInterestPerMinAmount = parseFloat(prev.accruedInterest) || 0;
+          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
           newData.totalSettlement = (parseFloat(transactionAmount) + parseFloat(accruedInterest)).toFixed(2);
           
-          // 驗證交易金額
-          const amount = parseFloat(transactionAmount);
-          const minAmount = parseFloat(prev.minAmount) || 0;
-          const minIncrement = parseFloat(prev.minIncrement) || 1;
-          
-          if (amount > 0 && minAmount > 0 && minIncrement > 0) {
-            const errors = validateTransactionAmount(amount, minAmount, minIncrement);
-            if (errors.length > 0) {
-              errors.forEach(error => toast.warning(error));
+          // 如果是數量改變，驗證數量是否符合最小承作和最小疊加要求
+          if (field === 'quantity') {
+            const minAmount = parseFloat(prev.minAmount) || 0;
+            const minIncrement = parseFloat(prev.minIncrement) || 1;
+            
+            if (qty > 0 && minAmount > 0 && minIncrement > 0) {
+              const errors = validateQuantity(qty, minAmount, minIncrement);
+              if (errors.length > 0) {
+                errors.forEach(error => toast.warning(error));
+              }
             }
           }
         }
@@ -502,38 +564,84 @@ const CardEditor = () => {
           const calculatedQuantity = (transactionAmount / (price / 100)).toFixed(2);
           newData.quantity = calculatedQuantity;
           
-          // 計算前手息：交易金額/10000*前手息（每一萬面額）
-          const accruedInterestPer10k = parseFloat(prev.accruedInterest) || 0;
-          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k).toFixed(2);
+          // 計算前手息：基於數量計算
+          const quantity = parseFloat(prev.quantity) || 0;
+          const minAmount = parseFloat(prev.minAmount) || 10000;
+          const accruedInterestPerMinAmount = parseFloat(prev.accruedInterest) || 0;
+          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
           newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
           
-          // 驗證交易金額
-          const minAmount = parseFloat(prev.minAmount) || 0;
-          const minIncrement = parseFloat(prev.minIncrement) || 1;
+          // 交易金額不再進行最小承作和最小疊加驗證
+        }
+      }
+      
+      // 當最小承作面額改變時，重新計算前手息
+      if (field === 'minAmount') {
+        const minAmount = parseFloat(value as string) || 0;
+        const couponRate = parseFloat(prev.couponRate) || 0;
+        const frequency = prev.paymentFrequency === '每年' ? 1 : 
+                         prev.paymentFrequency === '每半年' ? 2 :
+                         prev.paymentFrequency === '每季' ? 4 :
+                         prev.paymentFrequency === '每月' ? 12 : 2;
+        
+        if (minAmount > 0 && couponRate > 0) {
+          const newAccruedInterest = recalculateAccruedInterest(minAmount, couponRate, frequency, prev.lastCouponDate);
+          newData.accruedInterest = newAccruedInterest.toFixed(2);
           
-          if (minAmount > 0 && minIncrement > 0) {
-            const errors = validateTransactionAmount(transactionAmount, minAmount, minIncrement);
-            if (errors.length > 0) {
-              errors.forEach(error => toast.warning(error));
-            }
+          // 重新計算總交割金額
+          const transactionAmount = parseFloat(prev.transactionAmount) || 0;
+          const quantity = parseFloat(prev.quantity) || 0;
+          if (transactionAmount > 0 && quantity > 0) {
+            const accruedInterest = ((newAccruedInterest / minAmount) * quantity).toFixed(2);
+            newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
           }
         }
       }
       
-      // 當前手息（每一萬面額）改變時，重新計算總交割金額
+      // 當票面利率或付息頻率改變時，重新計算前手息
+      if (field === 'couponRate' || field === 'paymentFrequency') {
+        const minAmount = parseFloat(prev.minAmount) || 0;
+        const couponRate = field === 'couponRate' ? parseFloat(value as string) : parseFloat(prev.couponRate) || 0;
+        const frequency = field === 'paymentFrequency' ? 
+          (value === '每年' ? 1 : 
+           value === '每半年' ? 2 :
+           value === '每季' ? 4 :
+           value === '每月' ? 12 : 2) :
+          (prev.paymentFrequency === '每年' ? 1 : 
+           prev.paymentFrequency === '每半年' ? 2 :
+           prev.paymentFrequency === '每季' ? 4 :
+           prev.paymentFrequency === '每月' ? 12 : 2);
+        
+        if (minAmount > 0 && couponRate > 0) {
+          const newAccruedInterest = recalculateAccruedInterest(minAmount, couponRate, frequency, prev.lastCouponDate);
+          newData.accruedInterest = newAccruedInterest.toFixed(2);
+          
+          // 重新計算總交割金額
+          const transactionAmount = parseFloat(prev.transactionAmount) || 0;
+          const quantity = parseFloat(prev.quantity) || 0;
+          if (transactionAmount > 0 && quantity > 0) {
+            const accruedInterest = ((newAccruedInterest / minAmount) * quantity).toFixed(2);
+            newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
+          }
+        }
+      }
+      
+      // 當前手息（每一最小承作面額）改變時，重新計算總交割金額
       if (field === 'accruedInterest') {
         const transactionAmount = parseFloat(prev.transactionAmount) || 0;
-        const accruedInterestPer10k = parseFloat(value as string) || 0;
+        const quantity = parseFloat(prev.quantity) || 0;
+        const minAmount = parseFloat(prev.minAmount) || 10000;
+        const accruedInterestPerMinAmount = parseFloat(value as string) || 0;
         
-        if (transactionAmount > 0) {
-          const accruedInterest = (transactionAmount / 10000 * accruedInterestPer10k).toFixed(2);
+        if (transactionAmount > 0 && quantity > 0) {
+          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
           newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
         }
       }
       
       return newData;
     });
-  }, [validateTransactionAmount]);
+  }, [validateQuantity, recalculateAccruedInterest]);
 
   // 專門處理 YTM 輸入，確保輸入的是百分比值
   const handleYTMChange = useCallback((value: string) => {
@@ -605,14 +713,21 @@ const CardEditor = () => {
         newTradingPrice = prev.bidPrice || '';
       }
       
-      // 當參考價格改變時，根據交易金額重新計算數量
-      let newQuantity = prev.quantity;
-      if (newTradingPrice && prev.transactionAmount) {
+      // 數量固定不變，以新價格更新交易金額
+      let newTransactionAmount = prev.transactionAmount;
+      let newTotalSettlement = prev.totalSettlement;
+      
+      if (newTradingPrice && prev.quantity) {
         const price = parseFloat(newTradingPrice);
-        const transactionAmount = parseFloat(prev.transactionAmount);
+        const quantity = parseFloat(prev.quantity);
         
-        if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
-          newQuantity = (transactionAmount / price).toFixed(2);
+        if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
+          // 重新計算交易金額：債券價格是百分比，需要除以100
+          newTransactionAmount = ((price / 100) * quantity).toFixed(2);
+          
+          // 重新計算總交割金額
+          const accruedInterest = parseFloat(prev.accruedInterest) || 0;
+          newTotalSettlement = (parseFloat(newTransactionAmount) + accruedInterest).toFixed(2);
         }
       }
       
@@ -620,7 +735,8 @@ const CardEditor = () => {
         ...prev,
         tradeDirection: direction,
         tradingPrice: newTradingPrice,
-        quantity: newQuantity
+        transactionAmount: newTransactionAmount,
+        totalSettlement: newTotalSettlement
       };
     });
   }, []);
@@ -1417,7 +1533,7 @@ return (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="minAmount" className="flex items-center justify-between">
-                      最小承作金額(原幣)
+                      最小承作面額
                       {!editingFields.has('minAmount') && (
                         <Button
                           variant="ghost"
@@ -1461,7 +1577,7 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="minIncrement" className="flex items-center justify-between">
-                      最小累加金額(原幣)
+                      最小疊加面額
                       {!editingFields.has('minIncrement') && (
                         <Button
                           variant="ghost"
@@ -1524,7 +1640,7 @@ return (
                   <div>
                     <Label htmlFor="accruedInterest" className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        前手息（每一萬面額）
+                        前手息（每一最小承作面額）
                       </div>
                       {!editingFields.has('accruedInterest') && (
                         <Button
@@ -1679,7 +1795,7 @@ return (
                         </Button>
                       </div>
                     ) : (
-                      <Input id="bidPrice" type="number" step="0.01" value={cardData.bidPrice} readOnly className="bg-gray-50" />
+                      <Input id="bidPrice" type="number" step="0.01" value={parseFloat(cardData.bidPrice) ? parseFloat(cardData.bidPrice).toFixed(2) : cardData.bidPrice} readOnly className="bg-gray-50" />
                     )}
                   </div>
                   <div>
@@ -1724,7 +1840,7 @@ return (
                         </Button>
                       </div>
                     ) : (
-                      <Input id="askPrice" type="number" step="0.01" value={cardData.askPrice} readOnly className="bg-gray-50" />
+                      <Input id="askPrice" type="number" step="0.01" value={parseFloat(cardData.askPrice) ? parseFloat(cardData.askPrice).toFixed(2) : cardData.askPrice} readOnly className="bg-gray-50" />
                     )}
                   </div>
                   <div>
@@ -1776,12 +1892,22 @@ return (
                         </Button>
                       </div>
                     ) : (
-                      <Input id="tradingPrice" type="number" step="0.01" value={cardData.tradingPrice} readOnly className="bg-gray-50" />
+                      <Input id="tradingPrice" type="number" step="0.01" value={parseFloat(cardData.tradingPrice) ? parseFloat(cardData.tradingPrice).toFixed(2) : cardData.tradingPrice} readOnly className="bg-gray-50" />
                     )}
                   </div>
                   <div>
                     <Label htmlFor="quantity" className="flex items-center justify-between">
-                      數量 (Quantity)
+                      <div className="flex items-center gap-1">
+                        數量 (Quantity)
+                        {(() => {
+                          const quantity = parseFloat(cardData.quantity) || 0;
+                          const minAmount = parseFloat(cardData.minAmount) || 0;
+                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                          const hasError = quantity > 0 && minAmount > 0 && minIncrement > 0 && 
+                            (quantity < minAmount || quantity % minIncrement !== 0);
+                          return hasError ? <AlertCircle className="w-4 h-4 text-destructive" /> : null;
+                        })()}
+                  </div>
                       {!editingFields.has('quantity') && (
                         <Button
                           variant="ghost"
@@ -1819,27 +1945,51 @@ return (
                         >
                           <XIcon className="h-3 w-3" />
                         </Button>
-                      </div>
+                </div>
                     ) : (
-                      <Input id="quantity" type="text" value={formatNumber(cardData.quantity)} readOnly className="bg-gray-50" />
+                      <Input 
+                        id="quantity" 
+                        type="text" 
+                        value={formatNumber(cardData.quantity)} 
+                        readOnly 
+                        className={`bg-gray-50 ${(() => {
+                          const quantity = parseFloat(cardData.quantity) || 0;
+                          const minAmount = parseFloat(cardData.minAmount) || 0;
+                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                          const hasError = quantity > 0 && minAmount > 0 && minIncrement > 0 && 
+                            (quantity < minAmount || quantity % minIncrement !== 0);
+                          return hasError ? 'border-destructive' : '';
+                        })()}`}
+                      />
                     )}
+                    {(() => {
+                      const quantity = parseFloat(cardData.quantity) || 0;
+                      const minAmount = parseFloat(cardData.minAmount) || 0;
+                      const minIncrement = parseFloat(cardData.minIncrement) || 1;
+                      const errors: string[] = [];
+                      
+                      if (quantity > 0 && minAmount > 0 && quantity < minAmount) {
+                        errors.push(`小於最小承作面額 ${minAmount.toLocaleString()}`);
+                      }
+                      if (quantity > 0 && minIncrement > 0 && quantity % minIncrement !== 0) {
+                        errors.push(`最小疊加面額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
+                      }
+                      
+                      return errors.length > 0 ? (
+                        <div className="text-xs text-destructive mt-1">
+                          {errors.map((error, index) => (
+                            <div key={index}>{error}</div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="transactionAmount" className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        交易金額
-                        {(() => {
-                          const amount = parseFloat(cardData.transactionAmount) || 0;
-                          const minAmount = parseFloat(cardData.minAmount) || 0;
-                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
-                          const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
-                            (amount < minAmount || amount % minIncrement !== 0);
-                          return hasError ? <AlertCircle className="w-4 h-4 text-destructive" /> : null;
-                        })()}
-                      </div>
+                      交易金額
                       {!editingFields.has('transactionAmount') && (
                         <Button
                           variant="ghost"
@@ -1884,44 +2034,16 @@ return (
                         type="text" 
                         value={formatNumber(cardData.transactionAmount)} 
                         readOnly 
-                        className={`bg-gray-50 ${(() => {
-                          const amount = parseFloat(cardData.transactionAmount) || 0;
-                          const minAmount = parseFloat(cardData.minAmount) || 0;
-                          const minIncrement = parseFloat(cardData.minIncrement) || 1;
-                          const hasError = amount > 0 && minAmount > 0 && minIncrement > 0 && 
-                            (amount < minAmount || amount % minIncrement !== 0);
-                          return hasError ? 'border-destructive' : '';
-                        })()}`}
+                        className="bg-gray-50"
                       />
                     )}
-                    {(() => {
-                      const amount = parseFloat(cardData.transactionAmount) || 0;
-                      const minAmount = parseFloat(cardData.minAmount) || 0;
-                      const minIncrement = parseFloat(cardData.minIncrement) || 1;
-                      const errors: string[] = [];
-                      
-                      if (amount > 0 && minAmount > 0 && amount < minAmount) {
-                        errors.push(`小於最小承作金額 ${minAmount.toLocaleString()}`);
-                      }
-                      if (amount > 0 && minIncrement > 0 && amount % minIncrement !== 0) {
-                        errors.push(`最小疊加金額為 ${minIncrement.toLocaleString()}，請輸入 ${minIncrement.toLocaleString()} 的倍數`);
-                      }
-                      
-                      return errors.length > 0 ? (
-                        <div className="text-xs text-destructive mt-1">
-                          {errors.map((error, index) => (
-                            <div key={index}>{error}</div>
-                          ))}
-                        </div>
-                      ) : null;
-                    })()}
                   </div>
                   <div>
                     <Label htmlFor="accruedInterest">前手息</Label>
                     <Input 
                       id="accruedInterest" 
                       type="text" 
-                      value={formatNumber((parseFloat(cardData.transactionAmount) || 0) / 10000 * (parseFloat(cardData.accruedInterest) || 0))} 
+                      value={formatNumber(((parseFloat(cardData.accruedInterest) || 0) / (parseFloat(cardData.minAmount) || 10000)) * (parseFloat(cardData.quantity) || 0))} 
                       readOnly 
                       className="bg-gray-50 text-gray-500"
                     />
@@ -2203,9 +2325,9 @@ return (
       moodyRating: cardData.moodyRating,
       fitchRating: cardData.fitchRating,
       couponRate: parseFloat(cardData.couponRate) || 0,
-      yieldToMaturity: parseFloat(cardData.ytm) || 0,
-      bidPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
-      askPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
+      yieldToMaturity: (parseFloat(cardData.ytm) || 0) / 100, // cardData.ytm 已經是百分比格式，需要轉換回小數格式
+      bidPrice: parseFloat(cardData.bidPrice) || 0,
+      askPrice: parseFloat(cardData.askPrice) || 0,
 
       remainingYears: parseFloat(cardData.remainingYears) || 0,
 
@@ -2225,6 +2347,7 @@ return (
     isOpen={showDM} 
     onClose={() => setShowDM(false)}
     transactionAmount={parseFloat(cardData.transactionAmount) || undefined}
+    tradeDirection={cardData.tradeDirection}
   />
 </div>
 );

@@ -2,6 +2,7 @@
 // 提供統一的API調用介面
 
 import { getSupabaseUrl } from '@/utils/protocol';
+import { apiPost, ApiResponse } from '@/utils/apiHandler';
 
 const SUPABASE_URL = getSupabaseUrl();
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -19,29 +20,15 @@ async function callCbondsApi<T>(
   endpoint: string, 
   body: any = {}
 ): Promise<CbondsApiResponse<T>> {
-  try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  const response = await apiPost<T>(`${SUPABASE_URL}/functions/v1/${endpoint}`, {
+    ...body,
+    // 添加 Supabase 認證
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     }
+  }, false); // Supabase 使用自己的認證，不需要 token 失效處理
 
-    const data = await response.json();
-    return { data, status: response.status };
-  } catch (error) {
-    console.error(`Error calling ${endpoint}:`, error);
-    return { 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: 500 
-    };
-  }
+  return response;
 }
 
 

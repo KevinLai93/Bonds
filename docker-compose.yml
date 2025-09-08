@@ -39,3 +39,4 @@ services:
       - frontend
       - api
     restart: unless-stopped
+

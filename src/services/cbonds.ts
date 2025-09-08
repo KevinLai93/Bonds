@@ -1,4 +1,5 @@
 import { getDevApiUrl, getProdApiUrl } from '@/utils/protocol';
+import { apiGet, apiPost, ApiResponse } from '@/utils/apiHandler';
 
 // 根據環境和協議自動選擇 API 端點
 const getApiUrl = () => {
@@ -47,83 +48,33 @@ class AuthManager {
 const authManager = new AuthManager();
 
 async function cbondsGet(endpoint: string, params: any = {}, requiresAuth: boolean = true) {
-  const url = new URL(`${LOCAL_API_URL}/api/${endpoint}`);
+  const url = `${LOCAL_API_URL}/api/${endpoint}`;
+  console.log('呼叫本機 API:', url, '參數:', params);
+
+  const response = await apiGet(url, params, requiresAuth);
   
-  // 添加查詢參數
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.append(key, String(value));
-    }
-  });
-
-  console.log('呼叫本機 API:', url.toString());
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json"
-    };
-
-    // 如果需要認證，添加 Authorization header
-    if (requiresAuth) {
-      Object.assign(headers, authManager.getAuthHeaders());
-    }
-
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers
-    });
-
-    console.log('本機 API 回應狀態:', res.status);
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        // Token 過期，清除本地 token
-        authManager.clearToken();
-        throw new Error('認證已過期，請重新登入');
-      }
-      const text = await res.text();
-      console.error('本機 API 錯誤:', text);
-      throw new Error(`API 呼叫失敗: ${res.status} ${text}`);
-    }
-    
-    const json = await res.json();
-    
-    // 檢查回應中是否包含 TOKEN 失效錯誤
-    if (json.error === "Invalid token" || json.code === "INVALID_TOKEN") {
-      console.log('檢測到 TOKEN 失效:', json);
-      authManager.clearToken();
-      // 觸發登出事件
-      window.dispatchEvent(new CustomEvent('tokenExpired', { detail: { message: '當前登入已失效，請重新登入' } }));
-      throw new Error('當前登入已失效，請重新登入');
-    }
-    
-    console.log('本機 API 回應資料:', json);
-    return json;
-    
-  } catch (error) {
-    console.error('本機 API 呼叫失敗:', error);
-    throw error;
+  if (response.error) {
+    throw new Error(response.error);
   }
+  
+  console.log('本機 API 回應資料:', response.data);
+  return response.data;
 }
 
 // 公開 API 函數
 export const cbondsAPI = {
   // 認證相關
   async login(username: string, password: string) {
-    const response = await fetch(`${LOCAL_API_URL}/api/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password })
-    });
+    const response = await apiPost(`${LOCAL_API_URL}/api/login`, 
+      { username, password }, 
+      false // 登入不需要認證
+    );
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || '登入失敗');
+    if (response.error) {
+      throw new Error(response.error);
     }
     
-    const data = await response.json();
+    const data = response.data;
     authManager.setToken(data.token);
     return data;
   },
@@ -180,7 +131,8 @@ export const cbondsAPI = {
 
   // 健康檢查
   async healthCheck() {
-    return fetch(`${LOCAL_API_URL}/api/health`).then(res => res.json());
+    const response = await apiGet(`${LOCAL_API_URL}/api/health`, {}, false);
+    return response.data;
   }
 };
 

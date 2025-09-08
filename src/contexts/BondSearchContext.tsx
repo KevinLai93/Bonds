@@ -236,15 +236,38 @@ function computeSchedule(emission: any) {
   };
 }
 
-function computeACI(emission: any, schedule: any): number {
-  // 30/360 US rule accrued interest calculation
+function computeACI(emission: any, schedule: any, minDenomination?: number): number {
+  // 優先使用 API 返回的前手息數據
+  const apiAccruedInterest = parseFloat(emission.curr_coupon_sum || '0');
+  console.log('前手息計算 - API 數據:', {
+    isin: emission.isin_code,
+    curr_coupon_sum: emission.curr_coupon_sum,
+    apiAccruedInterest,
+    minDenomination,
+    baseAmount: minDenomination || 10000
+  });
+  
+  if (apiAccruedInterest > 0) {
+    // API 返回的是每1000面額的前手息，需要轉換為每最小承作面額的前手息
+    const baseAmount = minDenomination || 10000;
+    const conversionFactor = baseAmount / 1000; // 轉換係數
+    const convertedAccruedInterest = apiAccruedInterest * conversionFactor;
+    console.log('使用 API 前手息數據:', {
+      original: apiAccruedInterest,
+      conversionFactor,
+      converted: convertedAccruedInterest,
+      final: Math.round(convertedAccruedInterest * 100) / 100
+    });
+    return Math.round(convertedAccruedInterest * 100) / 100;
+  }
+  
+  // 如果 API 沒有返回前手息數據，則使用 30/360 US rule 計算
   if (!schedule.previousCouponDate) return 0;
   
   const couponRate = parseFloat(emission.emission_coupon_rate || emission.curr_coupon_rate || '0');
-  const nominal = parseFloat(emission.eurobonds_nominal || '0');
   const frequency = parseInt(emission.cupon_period) || 2;
   
-  if (couponRate === 0 || nominal === 0) return 0;
+  if (couponRate === 0) return 0;
   
   const today = new Date();
   const prevCoupon = new Date(schedule.previousCouponDate);
@@ -254,8 +277,11 @@ function computeACI(emission: any, schedule: any): number {
   const periodsPerYear = frequency;
   const daysInPeriod = 360 / periodsPerYear;
   
-  // Accrued interest = (days elapsed / days in period) × (nominal × annual rate / frequency)
-  const periodicCouponAmount = (nominal * couponRate / 100) / periodsPerYear;
+  // 使用最小承作面額作為計算基礎，如果沒有提供則使用預設的10000
+  const baseAmount = minDenomination || 10000;
+  
+  // Accrued interest = (days elapsed / days in period) × (base amount × annual rate / frequency)
+  const periodicCouponAmount = (baseAmount * couponRate / 100) / periodsPerYear;
   const accruedInterest = (days360 / daysInPeriod) * periodicCouponAmount;
   
   return Math.round(accruedInterest * 100) / 100; // Round to 2 decimal places
@@ -277,43 +303,113 @@ function calculateDays360US(startDate: Date, endDate: Date): number {
   return 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
 }
 
+// 獲取最新的有效價格資料
+function getLatestValidPrices(tradingData: TradingData[]): {
+  bidPrice: number;
+  askPrice: number;
+  lastPrice: number;
+  yieldToMaturity: number;
+  tradingDate: string;
+} | null {
+  if (tradingData.length === 0) return null;
+  
+  // 尋找最新的有效價格（至少有一個價格不為0）
+  for (const trading of tradingData) {
+    if (trading.bidPrice > 0 || trading.askPrice > 0 || trading.lastPrice > 0) {
+      // 檢查 BID 和 Ask 價格是否相同
+      if (trading.bidPrice === trading.askPrice && trading.bidPrice > 0 && trading.askPrice > 0) {
+        // 如果相同，繼續查找下一個不同的價格
+        console.log(`價格相同警告: BID=${trading.bidPrice}, Ask=${trading.askPrice}, 日期=${trading.tradingDate}`);
+        continue;
+      }
+      
+      return {
+        bidPrice: trading.bidPrice,
+        askPrice: trading.askPrice,
+        lastPrice: trading.lastPrice,
+        yieldToMaturity: trading.yieldToMaturity,
+        tradingDate: trading.tradingDate
+      };
+    }
+  }
+  
+  // 如果所有價格都相同，返回最新的價格（即使相同）
+  for (const trading of tradingData) {
+    if (trading.bidPrice > 0 || trading.askPrice > 0 || trading.lastPrice > 0) {
+      console.log(`所有價格都相同，使用最新價格: BID=${trading.bidPrice}, Ask=${trading.askPrice}, 日期=${trading.tradingDate}`);
+      return {
+        bidPrice: trading.bidPrice,
+        askPrice: trading.askPrice,
+        lastPrice: trading.lastPrice,
+        yieldToMaturity: trading.yieldToMaturity,
+        tradingDate: trading.tradingDate
+      };
+    }
+  }
+  
+  return null;
+}
+
 // 處理交易資料
 function processTradingData(tradingResponse: any): TradingData[] {
   if (!tradingResponse?.items) return [];
   
-  return tradingResponse.items.map((item: any) => {
-    // 根據 API 實際返回的字段名稱進行映射
-    const bidPrice = parseFloat(item.buying_quote || item.bid_price || '0');
-    const askPrice = parseFloat(item.selling_quote || item.ask_price || '0');
-    const lastPrice = parseFloat(item.last_price || '0');
-    
+  // 先過濾掉價格為0的資料，然後按日期排序
+  const validItems = tradingResponse.items
+    .map((item: any) => {
+      // 根據 API 實際返回的字段名稱進行映射
+      const bidPrice = parseFloat(item.buying_quote || item.bid_price || '0');
+      const askPrice = parseFloat(item.selling_quote || item.ask_price || '0');
+      const lastPrice = parseFloat(item.last_price || '0');
+      
+      return {
+        ...item,
+        bidPrice,
+        askPrice,
+        lastPrice
+      };
+    })
+    .filter((item: any) => {
+      // 過濾條件：至少有一個價格不為0
+      return item.bidPrice > 0 || item.askPrice > 0 || item.lastPrice > 0;
+    })
+    .sort((a: any, b: any) => {
+      // 按日期降序排序，確保最新的資料在前面
+      const dateA = new Date(a.date || a.trading_date || '');
+      const dateB = new Date(b.date || b.trading_date || '');
+      return dateB.getTime() - dateA.getTime();
+    });
+  
+  return validItems.map((item: any) => {
     // 使用中間價作為 YTM 的參考，或者使用 bid/offer 的平均值
     const ytmBid = parseFloat(item.ytm_bid || '0');
     const ytmOffer = parseFloat(item.ytm_offer || '0');
     let yieldToMaturity = ytmBid > 0 && ytmOffer > 0 ? (ytmBid + ytmOffer) / 2 : 
                          ytmBid > 0 ? ytmBid : ytmOffer;
     
-    // 保持原始 API 數據格式，不進行轉換
-    
     console.log('處理交易數據:', {
       isin: item.isin_code,
       buying_quote: item.buying_quote,
       selling_quote: item.selling_quote,
       last_price: item.last_price,
+      bidPrice: item.bidPrice,
+      askPrice: item.askPrice,
+      lastPrice: item.lastPrice,
       ytm_bid: item.ytm_bid,
       ytm_offer: item.ytm_offer,
-      calculated_ytm: yieldToMaturity
+      calculated_ytm: yieldToMaturity,
+      date: item.date || item.trading_date
     });
     
     return {
       isin: item.isin_code || '',
       tradingDate: item.date || item.trading_date || '',
-      bidPrice,
-      askPrice,
-      lastPrice,
+      bidPrice: item.bidPrice,
+      askPrice: item.askPrice,
+      lastPrice: item.lastPrice,
       volume: parseFloat(item.volume || '0'),
       yieldToMaturity,
-      spread: askPrice - bidPrice,
+      spread: item.askPrice - item.bidPrice,
       source: item.trading_ground_id || item.source || ''
     };
   });
@@ -421,9 +517,14 @@ function processGuarantorData(guarantorResponse: any): GuarantorData[] {
 
 function mapEmissionToBond(emission: any, emitentInfo?: any): Bond {
   const schedule = computeSchedule(emission);
-  const accruedInterest = computeACI(emission, schedule);
   const tenorYears = computeTenorYears(emission.maturity_date);
   const seniorityMapping = mapSeniority(emission.bond_rank_name_eng || emission.bond_rank_name || emission.bond_rank);
+  
+  // 獲取最小承作面額
+  const minDenomination = parseFloat(emission.eurobonds_nominal || emission.integral_multiple || '10000');
+  
+  // 使用最小承作面額計算前手息
+  const accruedInterest = computeACI(emission, schedule, minDenomination);
   
   return {
     id: emission.isin_code || '1',
@@ -489,29 +590,33 @@ function createExtendedBond(
   guarantors: GuarantorData[],
   emitentInfo?: any
 ): ExtendedBond {
-  // 使用最新的交易資料更新價格資訊
-  const latestTrading = tradingData.length > 0 ? tradingData[0] : null;
+  // 獲取最新的有效價格資料
+  const latestValidPrices = getLatestValidPrices(tradingData);
   
-  // 從交易數據中提取最新的價格和收益率
+  // 從交易數據中提取最新的有效價格和收益率
   let updatedBond = { ...baseBond };
   
-  if (latestTrading) {
-    // 使用交易數據中的實際價格
+  if (latestValidPrices) {
+    // 使用最新的有效價格資料
     updatedBond = {
       ...baseBond,
-      bidPrice: latestTrading.bidPrice || 0,
-      askPrice: latestTrading.askPrice || 0,
-      yieldToMaturity: latestTrading.yieldToMaturity || 0
+      bidPrice: latestValidPrices.bidPrice,
+      askPrice: latestValidPrices.askPrice,
+      yieldToMaturity: latestValidPrices.yieldToMaturity
     };
     
     console.log('更新債券價格數據:', {
-      bidPrice: latestTrading.bidPrice,
-      askPrice: latestTrading.askPrice,
-      yieldToMaturity: latestTrading.yieldToMaturity,
-      lastPrice: latestTrading.lastPrice
+      originalBidPrice: baseBond.bidPrice,
+      originalAskPrice: baseBond.askPrice,
+      finalBidPrice: latestValidPrices.bidPrice,
+      finalAskPrice: latestValidPrices.askPrice,
+      yieldToMaturity: latestValidPrices.yieldToMaturity,
+      lastPrice: latestValidPrices.lastPrice,
+      tradingDate: latestValidPrices.tradingDate,
+      totalTradingRecords: tradingData.length
     });
   } else {
-    console.log('沒有交易數據，使用預設值');
+    console.log('沒有有效的交易數據，使用預設值');
   }
 
   // 使用違約風險資料更新風險資訊
@@ -523,7 +628,17 @@ function createExtendedBond(
   return {
     ...riskUpdatedBond,
     tradingData,
-    latestTrading,
+    latestTrading: latestValidPrices ? {
+      isin: riskUpdatedBond.isin,
+      tradingDate: latestValidPrices.tradingDate,
+      bidPrice: latestValidPrices.bidPrice,
+      askPrice: latestValidPrices.askPrice,
+      lastPrice: latestValidPrices.lastPrice,
+      volume: 0, // 從 latestValidPrices 中沒有 volume 資訊
+      yieldToMaturity: latestValidPrices.yieldToMaturity,
+      spread: latestValidPrices.askPrice - latestValidPrices.bidPrice,
+      source: ''
+    } : null,
     paymentFlows,
     nextPayments: paymentFlows.filter(flow => 
       new Date(flow.paymentDate) > new Date()

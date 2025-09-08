@@ -9,11 +9,13 @@ import './bond-dm.css';
 interface BondDMProps {
   bond: Bond | ExtendedBond;
   isPreview?: boolean;
+  tradeDirection?: string; // 客戶需求：買/賣
 }
 
 export const BondDM: React.FC<BondDMProps> = ({ 
   bond, 
-  isPreview = false 
+  isPreview = false,
+  tradeDirection 
 }) => {
   const dmRef = useRef<HTMLDivElement>(null);
 
@@ -174,7 +176,17 @@ export const BondDM: React.FC<BondDMProps> = ({
           <div className="flex justify-center gap-8 mb-6">
             <div className="text-center">
               <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mb-2">
-                <span className="text-primary-foreground font-bold text-lg">{typeof bond.bidPrice === 'number' ? bond.bidPrice.toFixed(2) : bond.bidPrice}</span>
+                <span className="text-primary-foreground font-bold text-lg">{(() => {
+                  // 根據客戶需求選擇對應的價格
+                  if (tradeDirection === '買') {
+                    return typeof bond.askPrice === 'number' ? bond.askPrice.toFixed(2) : bond.askPrice;
+                  } else if (tradeDirection === '賣') {
+                    return typeof bond.bidPrice === 'number' ? bond.bidPrice.toFixed(2) : bond.bidPrice;
+                  } else {
+                    // 預設使用 Ask 價格（債券資訊頁面）
+                    return typeof bond.askPrice === 'number' ? bond.askPrice.toFixed(2) : bond.askPrice;
+                  }
+                })()}</span>
               </div>
               <p className="text-sm font-medium text-financial-dark-gray">價格</p>
             </div>

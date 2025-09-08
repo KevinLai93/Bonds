@@ -7,12 +7,14 @@ interface OriginalBondDMProps {
   bond: Bond | ExtendedBond;
   isPreview?: boolean;
   transactionAmount?: number; // 交易金額
+  tradeDirection?: string; // 客戶需求：買/賣
 }
 
 export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({ 
   bond, 
   isPreview = false,
-  transactionAmount 
+  transactionAmount,
+  tradeDirection 
 }) => {
   const { accountType } = useAuth();
   
@@ -232,7 +234,17 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
                   verticalAlign: 'middle',
                   textAlign: 'center',
                   display: 'inline-block'
-                }}>{typeof bond.bidPrice === 'number' ? bond.bidPrice.toFixed(2) : bond.bidPrice}</span>
+                }}>{(() => {
+                  // 根據客戶需求選擇對應的價格
+                  if (tradeDirection === '買') {
+                    return typeof bond.askPrice === 'number' ? bond.askPrice.toFixed(2) : bond.askPrice;
+                  } else if (tradeDirection === '賣') {
+                    return typeof bond.bidPrice === 'number' ? bond.bidPrice.toFixed(2) : bond.bidPrice;
+                  } else {
+                    // 預設使用 Ask 價格（債券資訊頁面）
+                    return typeof bond.askPrice === 'number' ? bond.askPrice.toFixed(2) : bond.askPrice;
+                  }
+                })()}</span>
               </div>
               <p className="text-sm font-medium" style={{ color: '#333333' }}>價格</p>
             </div>
@@ -253,7 +265,7 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
                   verticalAlign: 'middle',
                   textAlign: 'center',
                   display: 'inline-block'
-                }}>{typeof bond.yieldToMaturity === 'number' ? bond.yieldToMaturity.toFixed(2) : bond.yieldToMaturity}%</span>
+                }}>{typeof bond.yieldToMaturity === 'number' ? (bond.yieldToMaturity * 100).toFixed(2) : bond.yieldToMaturity}%</span>
               </div>
               <p className="text-sm font-medium" style={{ color: '#333333' }}>到期殖利率</p>
             </div>

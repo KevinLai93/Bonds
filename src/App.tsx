@@ -12,6 +12,7 @@ import SearchPage from "./pages/SearchPage";
 import BondDetail from "./pages/BondDetail";
 import CardEditor from "./pages/CardEditor";
 import DMPage from "./pages/DMPage";
+import TokenTestPage from "./pages/TokenTestPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,11 @@ const App = () => (
               <Route path="/dm/:isin" element={
                 <ProtectedRoute>
                   <DMPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/token-test" element={
+                <ProtectedRoute>
+                  <TokenTestPage />
                 </ProtectedRoute>
               } />
               

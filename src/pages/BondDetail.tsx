@@ -448,7 +448,7 @@ const BondDetail = () => {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">前手息 (每萬面額)</p>
+                  <p className="text-sm text-muted-foreground">前手息(最小承作金額)</p>
                   <p className="font-medium">{formatCurrency(displayBond.accruedInterest, displayBond.currency)}</p>
                 </div>
                 <div>
