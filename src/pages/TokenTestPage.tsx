@@ -8,6 +8,7 @@ import TokenExpiryTest from '@/components/TokenExpiryTest';
 import PriceFilterTest from '@/components/PriceFilterTest';
 import AccruedInterestTest from '@/components/AccruedInterestTest';
 import PriceDebugTest from '@/components/PriceDebugTest';
+import AccruedInterestDebug from '@/components/AccruedInterestDebug';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -30,10 +31,11 @@ const TokenTestPage: React.FC = () => {
       </Alert>
 
       <Tabs defaultValue="token-test" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="token-test">Token 失效測試</TabsTrigger>
           <TabsTrigger value="price-filter">價格過濾測試</TabsTrigger>
           <TabsTrigger value="accrued-interest">前手息計算測試</TabsTrigger>
+          <TabsTrigger value="accrued-debug">前手息調試</TabsTrigger>
           <TabsTrigger value="price-debug">價格調試測試</TabsTrigger>
         </TabsList>
         
@@ -47,6 +49,10 @@ const TokenTestPage: React.FC = () => {
         
         <TabsContent value="accrued-interest" className="space-y-4">
           <AccruedInterestTest />
+        </TabsContent>
+        
+        <TabsContent value="accrued-debug" className="space-y-4">
+          <AccruedInterestDebug />
         </TabsContent>
         
         <TabsContent value="price-debug" className="space-y-4">

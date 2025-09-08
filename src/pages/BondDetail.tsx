@@ -49,6 +49,105 @@ const BondDetail = () => {
   // 如果沒有匹配的債券資料，重定向到搜尋頁面
   if (!displayBond) return <Navigate to="/search" replace />;
 
+  // 強制重新計算前手息（用於調試）
+  const recalculateAccruedInterest = (bond: any) => {
+    if (!bond || bond.couponRate <= 0) return bond.accruedInterest || 0;
+    
+    const today = new Date();
+    const maturity = new Date(bond.maturityDate);
+    const frequency = bond.paymentFrequency === '每年' ? 1 : 
+                     bond.paymentFrequency === '每半年' ? 2 :
+                     bond.paymentFrequency === '每季' ? 4 :
+                     bond.paymentFrequency === '每月' ? 12 : 2;
+    
+    // 計算配息日期
+    const monthsInterval = 12 / frequency;
+    let firstCouponEnd: Date;
+    
+    if (bond.previousCouponDate) {
+      firstCouponEnd = new Date(bond.previousCouponDate);
+    } else {
+      // 如果沒有上次配息日，從發行日計算
+      const issueDate = new Date(bond.issueDate);
+      firstCouponEnd = new Date(issueDate);
+      firstCouponEnd.setMonth(firstCouponEnd.getMonth() + monthsInterval);
+    }
+    
+    // 生成配息日期
+    const couponDates: Date[] = [];
+    let currentDate = new Date(firstCouponEnd);
+    
+    while (currentDate <= maturity) {
+      couponDates.push(new Date(currentDate));
+      currentDate.setMonth(currentDate.getMonth() + monthsInterval);
+    }
+    
+    // 找到上次和下次配息日
+    let previousCouponDate: Date | null = null;
+    let nextCouponDate: Date | null = null;
+    
+    for (const date of couponDates) {
+      if (date <= today) {
+        previousCouponDate = date;
+      } else if (!nextCouponDate) {
+        nextCouponDate = date;
+        break;
+      }
+    }
+    
+    // 計算前手息 - 如果有上次配息日使用上次配息日，否則使用發行日
+    let startDate: Date;
+    if (previousCouponDate) {
+      startDate = previousCouponDate;
+      console.log('BondDetail 前手息計算 - 使用上次配息日:', {
+        isin: bond.isin,
+        previousCouponDate: previousCouponDate.toISOString().split('T')[0]
+      });
+    } else {
+      startDate = new Date(bond.issueDate);
+      console.log('BondDetail 前手息計算 - 使用發行日（剛發行債券）:', {
+        isin: bond.isin,
+        issueDate: bond.issueDate,
+        previousCouponDate: '無'
+      });
+    }
+    
+    // 30/360 US rule day count
+    let d1 = startDate.getDate();
+    let d2 = today.getDate();
+    let m1 = startDate.getMonth() + 1;
+    let m2 = today.getMonth() + 1;
+    let y1 = startDate.getFullYear();
+    let y2 = today.getFullYear();
+    
+    if (d1 === 31) d1 = 30;
+    if (d2 === 31 && d1 === 30) d2 = 30;
+    if (d2 === 31 && d1 < 30) d2 = 30;
+    
+    const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
+    const periodsPerYear = frequency;
+    const daysInPeriod = 360 / periodsPerYear;
+    const baseAmount = bond.minDenomination || 10000;
+    const periodicCouponAmount = (baseAmount * bond.couponRate / 100) / periodsPerYear;
+    const accruedInterest = (days360 / daysInPeriod) * periodicCouponAmount;
+    
+    console.log('BondDetail 前手息計算:', {
+      isin: bond.isin,
+      startDate: startDate.toISOString().split('T')[0],
+      today: today.toISOString().split('T')[0],
+      days360,
+      daysInPeriod,
+      baseAmount,
+      periodicCouponAmount,
+      accruedInterest: Math.round(accruedInterest * 100) / 100
+    });
+    
+    return Math.round(accruedInterest * 100) / 100;
+  };
+
+  // 重新計算前手息
+  const recalculatedAccruedInterest = recalculateAccruedInterest(displayBond);
+
   const handleGenerateCard = async () => {
     setIsGeneratingCard(true);
     
@@ -449,7 +548,7 @@ const BondDetail = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">前手息(最小承作金額)</p>
-                  <p className="font-medium">{formatCurrency(displayBond.accruedInterest, displayBond.currency)}</p>
+                  <p className="font-medium">{formatCurrency(recalculatedAccruedInterest, displayBond.currency)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">未償額</p>

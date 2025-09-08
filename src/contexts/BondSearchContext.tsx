@@ -202,11 +202,36 @@ function computeTenorYears(maturityDate: string): number {
 function computeSchedule(emission: any) {
   const today = new Date();
   const maturity = new Date(emission.maturity_date);
-  const firstCouponEnd = new Date(emission.first_coupon_end || emission.settlement_date);
   
   // Get coupon frequency (1=annual, 2=semi-annual, 4=quarterly, 12=monthly)
   const frequency = parseInt(emission.cupon_period) || 2;
   const monthsInterval = 12 / frequency; // Convert frequency to months interval
+  
+  // 嘗試多種方式獲取起始配息日期
+  let firstCouponEnd: Date;
+  
+  if (emission.first_coupon_end) {
+    firstCouponEnd = new Date(emission.first_coupon_end);
+  } else if (emission.settlement_date) {
+    firstCouponEnd = new Date(emission.settlement_date);
+  } else {
+    // 如果沒有明確的配息日期，嘗試從發行日計算
+    const issueDate = new Date(emission.issue_date);
+    firstCouponEnd = new Date(issueDate);
+    // 假設第一次配息在發行後6個月（對於半年配息）
+    firstCouponEnd.setMonth(firstCouponEnd.getMonth() + monthsInterval);
+  }
+  
+  console.log('配息日期計算:', {
+    isin: emission.isin_code,
+    issueDate: emission.issue_date,
+    maturityDate: emission.maturity_date,
+    firstCouponEnd: emission.first_coupon_end,
+    settlementDate: emission.settlement_date,
+    calculatedFirstCoupon: firstCouponEnd.toISOString().split('T')[0],
+    frequency,
+    monthsInterval
+  });
   
   // Generate coupon dates from first_coupon_end to maturity
   const couponDates: Date[] = [];
@@ -230,6 +255,14 @@ function computeSchedule(emission: any) {
     }
   }
   
+  console.log('配息日期結果:', {
+    isin: emission.isin_code,
+    previousCouponDate: previousCouponDate?.toISOString().split('T')[0] || '無',
+    nextCouponDate: nextCouponDate?.toISOString().split('T')[0] || '無',
+    totalCouponDates: couponDates.length,
+    couponDates: couponDates.map(d => d.toISOString().split('T')[0]).slice(0, 5) // 只顯示前5個
+  });
+  
   return {
     previousCouponDate: previousCouponDate?.toISOString().split('T')[0] || '',
     nextCouponDate: nextCouponDate?.toISOString().split('T')[0] || ''
@@ -237,43 +270,38 @@ function computeSchedule(emission: any) {
 }
 
 function computeACI(emission: any, schedule: any, minDenomination?: number): number {
-  // 優先使用 API 返回的前手息數據
-  const apiAccruedInterest = parseFloat(emission.curr_coupon_sum || '0');
-  console.log('前手息計算 - API 數據:', {
-    isin: emission.isin_code,
-    curr_coupon_sum: emission.curr_coupon_sum,
-    apiAccruedInterest,
-    minDenomination,
-    baseAmount: minDenomination || 10000
-  });
-  
-  if (apiAccruedInterest > 0) {
-    // API 返回的是每1000面額的前手息，需要轉換為每最小承作面額的前手息
-    const baseAmount = minDenomination || 10000;
-    const conversionFactor = baseAmount / 1000; // 轉換係數
-    const convertedAccruedInterest = apiAccruedInterest * conversionFactor;
-    console.log('使用 API 前手息數據:', {
-      original: apiAccruedInterest,
-      conversionFactor,
-      converted: convertedAccruedInterest,
-      final: Math.round(convertedAccruedInterest * 100) / 100
-    });
-    return Math.round(convertedAccruedInterest * 100) / 100;
-  }
-  
-  // 如果 API 沒有返回前手息數據，則使用 30/360 US rule 計算
-  if (!schedule.previousCouponDate) return 0;
-  
   const couponRate = parseFloat(emission.emission_coupon_rate || emission.curr_coupon_rate || '0');
   const frequency = parseInt(emission.cupon_period) || 2;
   
-  if (couponRate === 0) return 0;
+  if (couponRate === 0) {
+    console.log('前手息計算 - 票面利率為0:', {
+      isin: emission.isin_code,
+      couponRate
+    });
+    return 0;
+  }
   
   const today = new Date();
-  const prevCoupon = new Date(schedule.previousCouponDate);
+  let startDate: Date;
+  
+  // 如果有上次配息日，使用上次配息日；否則使用發行日
+  if (schedule.previousCouponDate) {
+    startDate = new Date(schedule.previousCouponDate);
+    console.log('前手息計算 - 使用上次配息日:', {
+      isin: emission.isin_code,
+      previousCouponDate: schedule.previousCouponDate
+    });
+  } else {
+    startDate = new Date(emission.issue_date);
+    console.log('前手息計算 - 使用發行日（剛發行債券）:', {
+      isin: emission.isin_code,
+      issueDate: emission.issue_date,
+      previousCouponDate: '無'
+    });
+  }
   
   // 30/360 US rule day count
-  const days360 = calculateDays360US(prevCoupon, today);
+  const days360 = calculateDays360US(startDate, today);
   const periodsPerYear = frequency;
   const daysInPeriod = 360 / periodsPerYear;
   
@@ -283,6 +311,19 @@ function computeACI(emission: any, schedule: any, minDenomination?: number): num
   // Accrued interest = (days elapsed / days in period) × (base amount × annual rate / frequency)
   const periodicCouponAmount = (baseAmount * couponRate / 100) / periodsPerYear;
   const accruedInterest = (days360 / daysInPeriod) * periodicCouponAmount;
+  
+  console.log('前手息計算 - 30/360 US rule:', {
+    isin: emission.isin_code,
+    startDate: startDate.toISOString().split('T')[0],
+    today: today.toISOString().split('T')[0],
+    couponRate,
+    frequency,
+    days360,
+    daysInPeriod,
+    baseAmount,
+    periodicCouponAmount,
+    accruedInterest: Math.round(accruedInterest * 100) / 100
+  });
   
   return Math.round(accruedInterest * 100) / 100; // Round to 2 decimal places
 }
@@ -590,6 +631,12 @@ function createExtendedBond(
   guarantors: GuarantorData[],
   emitentInfo?: any
 ): ExtendedBond {
+  console.log('createExtendedBond 被調用:', {
+    isin: baseBond.isin,
+    name: baseBond.name,
+    couponRate: baseBond.couponRate,
+    accruedInterest: baseBond.accruedInterest
+  });
   // 獲取最新的有效價格資料
   const latestValidPrices = getLatestValidPrices(tradingData);
   
@@ -618,6 +665,110 @@ function createExtendedBond(
   } else {
     console.log('沒有有效的交易數據，使用預設值');
   }
+
+  // 重新計算前手息（確保使用最新的計算邏輯）
+  console.log('開始重新計算前手息 - baseBond 數據:', {
+    isin: baseBond.isin,
+    couponRate: baseBond.couponRate,
+    paymentFrequency: baseBond.paymentFrequency,
+    minDenomination: baseBond.minDenomination,
+    maturityDate: baseBond.maturityDate,
+    issueDate: baseBond.issueDate,
+    previousCouponDate: baseBond.previousCouponDate,
+    nextCouponDate: baseBond.nextCouponDate,
+    originalAccruedInterest: baseBond.accruedInterest
+  });
+  
+  const today = new Date();
+  const maturity = new Date(baseBond.maturityDate);
+  const frequency = baseBond.paymentFrequency === '每年' ? 1 : 
+                   baseBond.paymentFrequency === '每半年' ? 2 :
+                   baseBond.paymentFrequency === '每季' ? 4 :
+                   baseBond.paymentFrequency === '每月' ? 12 : 2;
+  
+  // 計算配息日期
+  const monthsInterval = 12 / frequency;
+  let firstCouponEnd: Date;
+  
+  if (baseBond.previousCouponDate) {
+    firstCouponEnd = new Date(baseBond.previousCouponDate);
+  } else {
+    // 如果沒有上次配息日，從發行日計算
+    const issueDate = new Date(baseBond.issueDate);
+    firstCouponEnd = new Date(issueDate);
+    firstCouponEnd.setMonth(firstCouponEnd.getMonth() + monthsInterval);
+  }
+  
+  // 生成配息日期
+  const couponDates: Date[] = [];
+  let currentDate = new Date(firstCouponEnd);
+  
+  while (currentDate <= maturity) {
+    couponDates.push(new Date(currentDate));
+    currentDate.setMonth(currentDate.getMonth() + monthsInterval);
+  }
+  
+  // 找到上次和下次配息日
+  let previousCouponDate: Date | null = null;
+  let nextCouponDate: Date | null = null;
+  
+  for (const date of couponDates) {
+    if (date <= today) {
+      previousCouponDate = date;
+    } else if (!nextCouponDate) {
+      nextCouponDate = date;
+      break;
+    }
+  }
+  
+  // 重新計算前手息
+  let recalculatedAccruedInterest = 0;
+  if (baseBond.couponRate > 0) {
+    let startDate: Date;
+    
+    // 如果有上次配息日，使用上次配息日；否則使用發行日
+    if (previousCouponDate) {
+      startDate = previousCouponDate;
+      console.log('重新計算前手息 - 使用上次配息日:', {
+        isin: baseBond.isin,
+        previousCouponDate: previousCouponDate.toISOString().split('T')[0]
+      });
+    } else {
+      startDate = new Date(baseBond.issueDate);
+      console.log('重新計算前手息 - 使用發行日（剛發行債券）:', {
+        isin: baseBond.isin,
+        issueDate: baseBond.issueDate,
+        previousCouponDate: '無'
+      });
+    }
+    
+    const days360 = calculateDays360US(startDate, today);
+    const periodsPerYear = frequency;
+    const daysInPeriod = 360 / periodsPerYear;
+    const baseAmount = baseBond.minDenomination || 10000;
+    const periodicCouponAmount = (baseAmount * baseBond.couponRate / 100) / periodsPerYear;
+    recalculatedAccruedInterest = (days360 / daysInPeriod) * periodicCouponAmount;
+    recalculatedAccruedInterest = Math.round(recalculatedAccruedInterest * 100) / 100;
+  }
+  
+  console.log('重新計算前手息:', {
+    isin: baseBond.isin,
+    previousCouponDate: previousCouponDate?.toISOString().split('T')[0] || '無',
+    nextCouponDate: nextCouponDate?.toISOString().split('T')[0] || '無',
+    couponRate: baseBond.couponRate,
+    frequency,
+    minDenomination: baseBond.minDenomination,
+    originalAccruedInterest: baseBond.accruedInterest,
+    recalculatedAccruedInterest
+  });
+  
+  // 更新前手息
+  updatedBond = {
+    ...updatedBond,
+    accruedInterest: recalculatedAccruedInterest,
+    previousCouponDate: previousCouponDate?.toISOString().split('T')[0] || '',
+    nextCouponDate: nextCouponDate?.toISOString().split('T')[0] || ''
+  };
 
   // 使用違約風險資料更新風險資訊
   const riskUpdatedBond = defaultRisk ? {
