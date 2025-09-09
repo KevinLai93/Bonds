@@ -394,6 +394,22 @@ const CardEditor = () => {
         // ytm 由專門的 useEffect 處理，這裡不設置
         askPrice: bond.askPrice?.toString() || prev.askPrice,
         tradingPrice: bond.askPrice?.toString() || prev.tradingPrice, // 預設使用買價
+        // 重新計算交易金額
+        transactionAmount: (() => {
+          const price = bond.askPrice || parseFloat(prev.tradingPrice) || 100;
+          const quantity = parseFloat(prev.quantity) || 30000;
+          return (price * 0.01 * quantity).toFixed(2);
+        })(),
+        // 重新計算總交割金額
+        totalSettlement: (() => {
+          const price = bond.askPrice || parseFloat(prev.tradingPrice) || 100;
+          const quantity = parseFloat(prev.quantity) || 30000;
+          const transactionAmount = price * 0.01 * quantity;
+          const minAmount = parseFloat(bond.minDenomination?.toString() || prev.minAmount || '10000');
+          const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || prev.accruedInterest || '0');
+          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
+          return (transactionAmount + accruedInterest).toFixed(2);
+        })(),
         remainingYears: bond.remainingYears?.toString() || prev.remainingYears,
         spRating: bond.spRating || prev.spRating,
         moodyRating: bond.moodyRating || prev.moodyRating,
