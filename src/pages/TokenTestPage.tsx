@@ -10,6 +10,7 @@ import PriceFilterTest from '@/components/PriceFilterTest';
 import AccruedInterestTest from '@/components/AccruedInterestTest';
 import PriceDebugTest from '@/components/PriceDebugTest';
 import AccruedInterestDebug from '@/components/AccruedInterestDebug';
+import AccountTypeDebugTest from '@/components/AccountTypeDebugTest';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,13 +33,14 @@ const TokenTestPage: React.FC = () => {
       </Alert>
 
       <Tabs defaultValue="token-test" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="token-test">Token 失效測試</TabsTrigger>
           <TabsTrigger value="token-debug">Token 調試測試</TabsTrigger>
           <TabsTrigger value="price-filter">價格過濾測試</TabsTrigger>
           <TabsTrigger value="accrued-interest">前手息計算測試</TabsTrigger>
           <TabsTrigger value="accrued-debug">前手息調試</TabsTrigger>
           <TabsTrigger value="price-debug">價格調試測試</TabsTrigger>
+          <TabsTrigger value="account-type-debug">帳號類型調試</TabsTrigger>
         </TabsList>
         
         <TabsContent value="token-test" className="space-y-4">
@@ -63,6 +65,10 @@ const TokenTestPage: React.FC = () => {
         
         <TabsContent value="price-debug" className="space-y-4">
           <PriceDebugTest />
+        </TabsContent>
+        
+        <TabsContent value="account-type-debug" className="space-y-4">
+          <AccountTypeDebugTest />
         </TabsContent>
       </Tabs>
 
@@ -111,6 +117,16 @@ const TokenTestPage: React.FC = () => {
               <li>分析 API 返回的原始價格數據</li>
               <li>檢查數據處理邏輯是否正確</li>
               <li>識別價格相同的原因</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold mb-2">帳號類型調試功能:</h3>
+            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+              <li>測試 masterlink 帳號類型識別</li>
+              <li>檢查後端 API 返回的 accountType 資訊</li>
+              <li>驗證前端帳號類型處理邏輯</li>
+              <li>調試帳號類型相關的顯示問題</li>
             </ul>
           </div>
           
