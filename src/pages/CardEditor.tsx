@@ -207,12 +207,16 @@ const CardEditor = () => {
     transactionAmount: (() => {
       const quantity = 30000;
       const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
-      return (price * 0.01 * quantity).toFixed(2);
+      // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+      const formattedPrice = parseFloat(price.toFixed(2));
+      return (formattedPrice * 0.01 * quantity).toFixed(2);
     })(),
     totalSettlement: (() => {
       const quantity = 30000;
       const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
-      const transactionAmount = price * 0.01 * quantity;
+      // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+      const formattedPrice = parseFloat(price.toFixed(2));
+      const transactionAmount = formattedPrice * 0.01 * quantity;
       const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
       const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
       const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
@@ -273,12 +277,16 @@ const CardEditor = () => {
         transactionAmount: (() => {
           const quantity = 30000;
           const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
-          return (price * 0.01 * quantity).toFixed(2);
+          // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+          const formattedPrice = parseFloat(price.toFixed(2));
+          return (formattedPrice * 0.01 * quantity).toFixed(2);
         })(),
         totalSettlement: (() => {
           const quantity = 30000;
           const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
-          const transactionAmount = price * 0.01 * quantity;
+          // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+          const formattedPrice = parseFloat(price.toFixed(2));
+          const transactionAmount = formattedPrice * 0.01 * quantity;
           const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
           const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
           const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
@@ -398,13 +406,17 @@ const CardEditor = () => {
         transactionAmount: (() => {
           const price = bond.askPrice || parseFloat(prev.tradingPrice) || 100;
           const quantity = parseFloat(prev.quantity) || 30000;
-          return (price * 0.01 * quantity).toFixed(2);
+          // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+          const formattedPrice = parseFloat(price.toFixed(2));
+          return (formattedPrice * 0.01 * quantity).toFixed(2);
         })(),
         // 重新計算總交割金額
         totalSettlement: (() => {
           const price = bond.askPrice || parseFloat(prev.tradingPrice) || 100;
           const quantity = parseFloat(prev.quantity) || 30000;
-          const transactionAmount = price * 0.01 * quantity;
+          // 確保價格先格式化為小數點後兩位，避免浮點數精度問題
+          const formattedPrice = parseFloat(price.toFixed(2));
+          const transactionAmount = formattedPrice * 0.01 * quantity;
           const minAmount = parseFloat(bond.minDenomination?.toString() || prev.minAmount || '10000');
           const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || prev.accruedInterest || '0');
           const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
