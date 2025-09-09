@@ -137,6 +137,8 @@ const CardEditor = () => {
         return '#E60012'; // 使用現有的品牌色 (對應 var(--brand-600))
       case 'ubot':
         return '#16899d'; // Ubot 專用色
+      case 'masterlink':
+        return '#E8180E'; // 元富紅
       default:
         return '#54b5e9'; // EUF 顏色
     }

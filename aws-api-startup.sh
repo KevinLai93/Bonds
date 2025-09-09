@@ -46,3 +46,4 @@ echo "✅ API 已啟動！"
 echo "🔧 API 地址: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000"
 
 
+

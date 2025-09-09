@@ -25,6 +25,8 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
         return "/hua-nan-logo.png";
       case 'ubot':
         return "/ubot-logo.png";
+      case 'masterlink':
+        return "/masterlink.png";
       default:
         // 其他類型顯示 EUF logo
         return "/euf.png";
@@ -41,6 +43,8 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
         return "華南永昌證券";
       case 'ubot':
         return "Ubot Logo";
+      case 'masterlink':
+        return "元富證券";
       default:
         return "EUF Logo";
     }

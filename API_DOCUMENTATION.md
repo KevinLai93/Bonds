@@ -98,6 +98,7 @@ Authorization: Bearer {JWT_TOKEN}
 | **analyst** | 財務分析師 | analysis | 用戶名以 `analyst` 開頭 | 分析師權限 |
 | **entrust** | 信託用戶 | investment | 用戶名以 `entrust` 開頭 | 投資相關權限 |
 | **ubot** | UBot用戶 | automation | 用戶名以 `ubot` 開頭 | 自動化權限 |
+| **masterlink** | 元富證券 | investment | 用戶名以 `masterlink` 開頭 | 元富證券權限 |
 | **user** | 一般用戶 | basic | 其他用戶名 | 基本權限 |
 
 ### 可用帳號
@@ -111,6 +112,8 @@ Authorization: Bearer {JWT_TOKEN}
 | entrust003 | vu7UrMEG4v | user | entrust | investment | 信託用戶3 |
 | ubot001 | ubot123456 | user | ubot | automation | UBot用戶1 |
 | ubot002 | ubot789012 | user | ubot | automation | UBot用戶2 |
+| masterlink001 | masterlink123 | user | masterlink | investment | 元富證券用戶1 |
+| masterlink002 | masterlink456 | user | masterlink | investment | 元富證券用戶2 |
 
 ## 📊 債券數據 API
 

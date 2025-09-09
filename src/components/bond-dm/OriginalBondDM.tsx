@@ -29,6 +29,8 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#E60012'; // 華南永昌證券紅色
       case 'ubot':
         return '#16899d'; // Ubot 專用色
+      case 'masterlink':
+        return '#E8180E'; // 元富紅
       default:
         return '#54b5e9'; // EUF 顏色
     }
@@ -45,6 +47,8 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#E60012'; // 華南永昌證券紅色
       case 'ubot':
         return '#e6003b'; // Ubot 紅
+      case 'masterlink':
+        return '#E8180E'; // 元富紅
       default:
         return '#9d5bc3'; // EUF 紫色
     }
