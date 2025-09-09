@@ -207,12 +207,12 @@ const CardEditor = () => {
     transactionAmount: (() => {
       const quantity = 30000;
       const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
-      return ((price / 100) * quantity).toFixed(2);
+      return calculateTransactionAmount(price, quantity, 2);
     })(),
     totalSettlement: (() => {
       const quantity = 30000;
       const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
-      const transactionAmount = (price / 100) * quantity;
+      const transactionAmount = parseFloat(calculateTransactionAmount(price, quantity, 2));
       const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
       const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
       const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
@@ -273,12 +273,12 @@ const CardEditor = () => {
         transactionAmount: (() => {
           const quantity = 30000;
           const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100; // 使用買價或預設100
-          return ((price / 100) * quantity).toFixed(2);
+          return calculateTransactionAmount(price, quantity, 2);
         })(),
         totalSettlement: (() => {
           const quantity = 30000;
           const price = bond.askPrice && bond.askPrice > 0 ? bond.askPrice : 100;
-          const transactionAmount = (price / 100) * quantity;
+          const transactionAmount = parseFloat(calculateTransactionAmount(price, quantity, 2));
           const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
           const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
           const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
@@ -456,6 +456,19 @@ const CardEditor = () => {
     return errors;
   }, []);
 
+  // 避免浮點數精度問題的價格計算函數
+  const calculateTransactionAmount = useCallback((price: number, quantity: number, decimalPlaces: number = 2) => {
+    // 將價格轉換為整數進行計算，避免浮點數精度問題
+    const priceStr = price.toFixed(decimalPlaces);
+    const priceInt = Math.round(parseFloat(priceStr) * Math.pow(10, decimalPlaces));
+    const quantityInt = Math.round(quantity);
+    
+    // 計算：price * 0.01 * quantity = (price * quantity) / 100
+    const result = (priceInt * quantityInt) / (100 * Math.pow(10, decimalPlaces));
+    
+    return result.toFixed(decimalPlaces);
+  }, []);
+
   // 重新計算前手息（基於最小承作面額）
   const recalculateAccruedInterest = useCallback((minAmount: number, couponRate: number, frequency: number, lastCouponDate?: string) => {
     if (couponRate === 0 || minAmount === 0) return 0;
@@ -507,7 +520,7 @@ const CardEditor = () => {
         const price = parseFloat(value as string);
         const quantity = parseFloat(prev.quantity);
         if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
-          newData.transactionAmount = ((price / 100) * quantity).toFixed(2);
+          newData.transactionAmount = calculateTransactionAmount(price, quantity, 2);
           // 重新計算總交割金額
           const accruedInterest = parseFloat(prev.accruedInterest) || 0;
           newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
@@ -518,7 +531,7 @@ const CardEditor = () => {
         const price = parseFloat(value as string);
         const quantity = parseFloat(prev.quantity);
         if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
-          newData.transactionAmount = ((price / 100) * quantity).toFixed(2);
+          newData.transactionAmount = calculateTransactionAmount(price, quantity, 2);
           // 重新計算總交割金額
           const accruedInterest = parseFloat(prev.accruedInterest) || 0;
           newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
@@ -531,7 +544,7 @@ const CardEditor = () => {
         const qty = parseFloat(field === 'quantity' ? value as string : prev.quantity);
         
         if (!isNaN(price) && !isNaN(qty) && price > 0 && qty > 0) {
-          const transactionAmount = ((price / 100) * qty).toFixed(2);
+          const transactionAmount = calculateTransactionAmount(price, qty, 2);
           newData.transactionAmount = transactionAmount;
           
           // 計算前手息：基於數量計算
@@ -562,7 +575,8 @@ const CardEditor = () => {
         const transactionAmount = parseFloat(value as string);
         
         if (!isNaN(price) && !isNaN(transactionAmount) && price > 0 && transactionAmount > 0) {
-          const calculatedQuantity = (transactionAmount / (price / 100)).toFixed(2);
+          // 反向計算：quantity = transactionAmount / (price * 0.01)
+          const calculatedQuantity = (transactionAmount / (price * 0.01)).toFixed(2);
           newData.quantity = calculatedQuantity;
           
           // 計算前手息：基於數量計算
@@ -724,7 +738,7 @@ const CardEditor = () => {
         
         if (!isNaN(price) && !isNaN(quantity) && price > 0 && quantity > 0) {
           // 重新計算交易金額：債券價格是百分比，需要除以100
-          newTransactionAmount = ((price / 100) * quantity).toFixed(2);
+          newTransactionAmount = calculateTransactionAmount(price, quantity, 2);
           
           // 重新計算總交割金額
           const accruedInterest = parseFloat(prev.accruedInterest) || 0;

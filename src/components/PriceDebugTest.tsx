@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { apiGet } from '@/utils/apiHandler';
 
 const PriceDebugTest: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
@@ -44,27 +45,21 @@ const PriceDebugTest: React.FC = () => {
     addTestResult('價格數據調試', 'pending', `正在調試 ${isin} 的價格數據...`);
     
     try {
-      // 調用交易數據 API - 使用正確的 API 服務器端口
+      // 調用交易數據 API - 使用統一的 apiHandler
       const apiUrl = import.meta.env.DEV 
         ? (import.meta.env.VITE_API_BASE_URL_HTTP || 'http://localhost:3000')
         : (import.meta.env.VITE_PROD_API_BASE_URL_HTTP || 'http://localhost:3000');
       
-      const response = await fetch(`${apiUrl}/api/cbonds/get_tradings_new?isin=${isin}&sort_by=date_desc`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await apiGet(`${apiUrl}/api/cbonds/get_tradings_new`, {
+        isin: isin,
+        sort_by: 'date_desc'
+      }, true);
 
-      if (!response.ok) {
-        throw new Error(`API 調用失敗: ${response.status}`);
+      if (response.error) {
+        throw new Error(response.error);
       }
 
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      const data = response.data;
 
       const tradingData = data.items || [];
       
