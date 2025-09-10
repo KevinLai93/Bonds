@@ -6,6 +6,7 @@
 import React from 'react';
 import TokenExpiryTest from '@/components/TokenExpiryTest';
 import TokenExpiryDebugTest from '@/components/TokenExpiryDebugTest';
+import TokenDebugTest from '@/components/TokenDebugTest';
 import PriceFilterTest from '@/components/PriceFilterTest';
 import AccruedInterestTest from '@/components/AccruedInterestTest';
 import PriceDebugTest from '@/components/PriceDebugTest';
@@ -33,9 +34,10 @@ const TokenTestPage: React.FC = () => {
       </Alert>
 
       <Tabs defaultValue="token-test" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="token-test">Token 失效測試</TabsTrigger>
           <TabsTrigger value="token-debug">Token 調試測試</TabsTrigger>
+          <TabsTrigger value="token-simple">Token 簡單測試</TabsTrigger>
           <TabsTrigger value="price-filter">價格過濾測試</TabsTrigger>
           <TabsTrigger value="accrued-interest">前手息計算測試</TabsTrigger>
           <TabsTrigger value="accrued-debug">前手息調試</TabsTrigger>
@@ -49,6 +51,10 @@ const TokenTestPage: React.FC = () => {
         
         <TabsContent value="token-debug" className="space-y-4">
           <TokenExpiryDebugTest />
+        </TabsContent>
+        
+        <TabsContent value="token-simple" className="space-y-4">
+          <TokenDebugTest />
         </TabsContent>
         
         <TabsContent value="price-filter" className="space-y-4">
