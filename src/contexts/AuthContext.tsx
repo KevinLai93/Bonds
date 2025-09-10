@@ -83,29 +83,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 監聽 TOKEN 失效事件
   useEffect(() => {
     const handleTokenExpired = (event: CustomEvent) => {
-      console.log('🔴 AuthContext 收到 tokenExpired 事件:', event.detail);
       const message = event.detail?.message || '當前登入已失效，請重新登入';
       
-      console.log('🔴 顯示 toast 提示訊息...');
       // 顯示提示訊息
       toast.error(message);
       
-      console.log('🔴 執行登出...');
       // 執行登出
       logout();
       
-      console.log('🔴 跳轉到登入頁面...');
       // 跳轉到登入頁面
       navigate('/login');
     };
 
-    console.log('🔴 AuthContext 添加 tokenExpired 事件監聽器');
     // 添加事件監聽器
     window.addEventListener('tokenExpired', handleTokenExpired as EventListener);
 
     // 清理事件監聽器
     return () => {
-      console.log('🔴 AuthContext 移除 tokenExpired 事件監聽器');
       window.removeEventListener('tokenExpired', handleTokenExpired as EventListener);
     };
   }, [navigate]);
