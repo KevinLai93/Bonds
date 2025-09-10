@@ -33,16 +33,8 @@ function triggerTokenExpired(message: string = '當前登入已失效，請重�
 function isTokenExpired(response: any): boolean {
   if (!response) return false;
   
-  // 添加調試信息
-  console.log('檢查 token 失效:', {
-    response,
-    error: response.error,
-    code: response.code,
-    message: response.message
-  });
-  
   // 檢查各種可能的 token 失效錯誤格式
-  const isExpired = (
+  return (
     response.error === "Invalid token" ||
     response.error === "invalid token" ||
     response.code === "INVALID_TOKEN" ||
@@ -50,9 +42,6 @@ function isTokenExpired(response: any): boolean {
     response.error === "認證已過期，請重新登入" ||
     response.error === "當前登入已失效，請重新登入"
   );
-  
-  console.log('Token 失效檢查結果:', isExpired);
-  return isExpired;
 }
 
 /**
@@ -106,22 +95,16 @@ export async function apiCall<T = any>(
       
       // 對於 403 錯誤，也要檢查是否為 token 失效
       if (response.status === 403) {
-        console.log('收到 403 錯誤，檢查是否為 token 失效');
         try {
           const errorData = await response.json();
-          console.log('403 錯誤數據:', errorData);
           if (isTokenExpired(errorData)) {
-            console.log('確認是 token 失效，觸發登出');
             localStorage.removeItem('token');
             localStorage.removeItem('bonds_user');
             localStorage.removeItem('bonds_account_type');
             triggerTokenExpired(errorData.message || '當前登入已失效，請重新登入');
             return { error: errorData.message || '當前登入已失效，請重新登入' };
-          } else {
-            console.log('403 錯誤不是 token 失效');
           }
         } catch (jsonError) {
-          console.log('403 錯誤無法解析為 JSON:', jsonError);
           // 403 錯誤無法解析為 JSON，繼續正常處理
         }
       }
