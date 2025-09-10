@@ -31,6 +31,8 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#16899d'; // Ubot 專用色
       case 'masterlink':
         return '#E8180E'; // 元富紅
+      case 'esun':
+        return '#019c97'; // 玉山綠
       default:
         return '#54b5e9'; // EUF 顏色
     }
@@ -49,6 +51,8 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#e6003b'; // Ubot 紅
       case 'masterlink':
         return '#E8180E'; // 元富紅
+      case 'esun':
+        return '#019c97'; // 玉山綠
       default:
         return '#9d5bc3'; // EUF 紫色
     }

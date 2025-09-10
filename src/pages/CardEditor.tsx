@@ -139,6 +139,8 @@ const CardEditor = () => {
         return '#16899d'; // Ubot 專用色
       case 'masterlink':
         return '#E8180E'; // 元富紅
+      case 'esun':
+        return '#019c97'; // 玉山綠
       default:
         return '#54b5e9'; // EUF 顏色
     }

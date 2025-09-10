@@ -99,6 +99,7 @@ Authorization: Bearer {JWT_TOKEN}
 | **entrust** | 信託用戶 | investment | 用戶名以 `entrust` 開頭 | 投資相關權限 |
 | **ubot** | UBot用戶 | automation | 用戶名以 `ubot` 開頭 | 自動化權限 |
 | **masterlink** | 元富證券 | investment | 用戶名以 `masterlink` 開頭 | 元富證券權限 |
+| **esun** | 玉山銀行 | investment | 用戶名以 `esun` 開頭 | 玉山銀行權限 |
 | **user** | 一般用戶 | basic | 其他用戶名 | 基本權限 |
 
 ### 可用帳號
@@ -114,6 +115,8 @@ Authorization: Bearer {JWT_TOKEN}
 | ubot002 | ubot789012 | user | ubot | automation | UBot用戶2 |
 | masterlink001 | masterlink123 | user | masterlink | investment | 元富證券用戶1 |
 | masterlink002 | masterlink456 | user | masterlink | investment | 元富證券用戶2 |
+| esun001 | esun123456 | user | esun | investment | 玉山銀行用戶1 |
+| esun002 | esun789012 | user | esun | investment | 玉山銀行用戶2 |
 
 ## 📊 債券數據 API
 
