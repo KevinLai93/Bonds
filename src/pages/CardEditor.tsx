@@ -2423,8 +2423,8 @@ return (
       fitchRating: cardData.fitchRating,
       couponRate: parseFloat(cardData.couponRate) || 0,
       yieldToMaturity: (parseFloat(cardData.ytm) || 0) / 100, // cardData.ytm 已經是百分比格式，需要轉換回小數格式
-      bidPrice: parseFloat(cardData.bidPrice) || 0,
-      askPrice: parseFloat(cardData.askPrice) || 0,
+      bidPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
+      askPrice: parseFloat(cardData.tradingPrice) || 0, // 使用參考價格
 
       remainingYears: parseFloat(cardData.remainingYears) || 0,
 
