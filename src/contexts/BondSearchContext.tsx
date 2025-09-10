@@ -282,6 +282,17 @@ function computeSchedule(emission: any) {
     monthsInterval
   });
   
+  return {
+    isin: emission.isin_code,
+    issueDate: emission.issue_date,
+    maturityDate: emission.maturity_date,
+    firstCouponEnd: emission.first_coupon_end,
+    settlementDate: emission.settlement_date,
+    calculatedFirstCoupon: firstCouponEnd.toISOString().split('T')[0],
+    frequency,
+    monthsInterval
+  };
+  
   // Generate coupon dates from first_coupon_end to maturity
   const couponDates: Date[] = [];
   let currentDate = new Date(firstCouponEnd);
