@@ -37,6 +37,7 @@ function isTokenExpired(response: any): boolean {
   // 檢查各種可能的 token 失效錯誤格式
   return (
     response.error === "Invalid token" ||
+    response.error === "invalid token" ||
     response.code === "INVALID_TOKEN" ||
     response.message === "The provided token is invalid or expired" ||
     response.error === "認證已過期，請重新登入" ||
