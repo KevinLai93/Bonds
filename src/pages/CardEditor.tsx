@@ -22,6 +22,7 @@ import { ProfessionalBondCard } from '@/components/ProfessionalBondCard';
 import { useBondSearch } from '@/contexts/BondSearchContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { BondDMModal } from '@/components/bond-dm/BondDMModal';
+import { calculateYTM, calculatePerpetualYTM, type YTMCalculationParams } from '@/utils/ytmCalculator';
 
 // 格式化數字：添加千分位，當小數點後無數字時不顯示兩位數
 const formatNumber = (value: string | number): string => {
@@ -333,30 +334,18 @@ const CardEditor = () => {
     if (bond && extendedBond && extendedBond.isin === isin && !isInitialized) {
       console.log('CardEditor - extendedBond 數據已加載，重新初始化 cardData');
       
-      // 計算 YTM - 檢查是否需要轉換
-      let ytmValue = '';
-      if (extendedBond.yieldToMaturity && extendedBond.yieldToMaturity > 0) {
-        let finalYtm = extendedBond.yieldToMaturity;
-        
-        // 如果 YTM 值小於 1，表示是小數形式，需要乘以 100 轉換為百分比
-        if (finalYtm < 1) {
-          finalYtm = finalYtm * 100;
+      // 使用前端計算 YTM，而不是從後端獲取
+      const referencePrice = parseFloat(extendedBond.askPrice?.toString() || extendedBond.bidPrice?.toString() || '0');
+      const ytmValue = calculateYTMValue(referencePrice, extendedBond);
+      console.log('CardEditor - 前端計算 YTM:', {
+        referencePrice: referencePrice,
+        ytmValue: ytmValue,
+        bondData: {
+          couponRate: extendedBond.couponRate,
+          remainingYears: extendedBond.remainingYears,
+          maturityType: extendedBond.maturityType
         }
-        
-        finalYtm = Math.round(finalYtm * 100) / 100; // 四捨五入到小數點第二位
-        ytmValue = finalYtm.toString();
-        console.log('CardEditor - YTM 計算:', {
-          original: extendedBond.yieldToMaturity,
-          isLessThanOne: extendedBond.yieldToMaturity < 1,
-          final: finalYtm,
-          ytmValue: ytmValue
-        });
-      } else {
-        console.log('CardEditor - YTM 條件不滿足:', {
-          yieldToMaturity: extendedBond.yieldToMaturity,
-          isPositive: extendedBond.yieldToMaturity > 0
-        });
-      }
+      });
       
       // 計算票息類型
       const couponType = extendedBond.couponType || '固定';
@@ -556,6 +545,8 @@ const CardEditor = () => {
           // 重新計算總交割金額
           const accruedInterest = parseFloat(prev.accruedInterest) || 0;
           newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
+          // 重新計算 YTM
+          newData.ytm = calculateYTMValue(price, bond);
         }
       } else if (field === 'askPrice' && prev.tradeDirection === '買') {
         newData.tradingPrice = value as string;
@@ -567,6 +558,8 @@ const CardEditor = () => {
           // 重新計算總交割金額
           const accruedInterest = parseFloat(prev.accruedInterest) || 0;
           newData.totalSettlement = (parseFloat(newData.transactionAmount) + accruedInterest).toFixed(2);
+          // 重新計算 YTM
+          newData.ytm = calculateYTMValue(price, bond);
         }
       }
       
@@ -585,6 +578,11 @@ const CardEditor = () => {
           const accruedInterestPerMinAmount = parseFloat(prev.accruedInterest) || 0;
           const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
           newData.totalSettlement = (parseFloat(transactionAmount) + parseFloat(accruedInterest)).toFixed(2);
+          
+          // 當參考價格改變時，重新計算 YTM
+          if (field === 'tradingPrice') {
+            newData.ytm = calculateYTMValue(price, bond);
+          }
           
           // 如果是數量改變，驗證數量是否符合最小承作和最小疊加要求
           if (field === 'quantity') {
@@ -689,6 +687,33 @@ const CardEditor = () => {
       return newData;
     });
   }, [validateQuantity, recalculateAccruedInterest]);
+
+  // 計算 YTM 的函數
+  const calculateYTMValue = useCallback((price: number, bond: Bond | ExtendedBond | null) => {
+    if (!bond || price <= 0) return '0';
+    
+    // 永續債券的 YTM 計算
+    if (bond.maturityType === '永續') {
+      const ytm = calculatePerpetualYTM(price, parseFloat(cardData.couponRate) || 0);
+      return ytm.toFixed(2);
+    }
+    
+    // 一般債券的 YTM 計算
+    const params: YTMCalculationParams = {
+      price: price,
+      faceValue: 100, // 假設面值為 100
+      couponRate: parseFloat(cardData.couponRate) || 0,
+      yearsToMaturity: parseFloat(cardData.remainingYears) || 0,
+      paymentFrequency: cardData.paymentFrequency === '每年' ? 1 : 
+                       cardData.paymentFrequency === '每半年' ? 2 : 
+                       cardData.paymentFrequency === '每季' ? 4 : 2,
+      nextCouponDate: cardData.nextCouponDate,
+      issueDate: cardData.issueDate
+    };
+    
+    const ytm = calculateYTM(params);
+    return ytm.toFixed(2);
+  }, [cardData.couponRate, cardData.remainingYears, cardData.paymentFrequency, cardData.nextCouponDate, cardData.issueDate, cardData.maturityType]);
 
   // 專門處理 YTM 輸入，確保輸入的是百分比值
   const handleYTMChange = useCallback((value: string) => {
@@ -1906,7 +1931,54 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="ytm">到期殖利率 (%)</Label>
-                    <Input id="ytm" type="number" step="0.01" value={cardData.ytm} readOnly className="bg-gray-50 text-gray-500" />
+                    {editingFields.has('ytm') ? (
+                      <Input 
+                        id="ytm" 
+                        type="number" 
+                        step="0.01" 
+                        value={tempValues.ytm || cardData.ytm} 
+                        onChange={(e) => setTempValues(prev => ({ ...prev, ytm: e.target.value }))}
+                        onBlur={() => {
+                          handleYTMChange(tempValues.ytm || cardData.ytm);
+                          setEditingFields(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete('ytm');
+                            return newSet;
+                          });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleYTMChange(tempValues.ytm || cardData.ytm);
+                            setEditingFields(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete('ytm');
+                              return newSet;
+                            });
+                          } else if (e.key === 'Escape') {
+                            setEditingFields(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete('ytm');
+                              return newSet;
+                            });
+                          }
+                        }}
+                        className="text-right"
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="relative">
+                        <Input 
+                          id="ytm" 
+                          type="number" 
+                          step="0.01" 
+                          value={cardData.ytm} 
+                          readOnly 
+                          className="bg-gray-50 text-gray-500 cursor-pointer" 
+                          onClick={() => startEditing('ytm')}
+                        />
+                        <Edit3 className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
