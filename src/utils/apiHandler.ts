@@ -22,10 +22,12 @@ interface ApiOptions {
  * 觸發 token 失效事件
  */
 function triggerTokenExpired(message: string = '當前登入已失效，請重新登入') {
-  console.log('觸發 TOKEN 失效事件:', message);
+  console.log('🔴 觸發 TOKEN 失效事件:', message);
+  console.log('🔴 發送 tokenExpired 事件到 window...');
   window.dispatchEvent(new CustomEvent('tokenExpired', { 
     detail: { message } 
   }));
+  console.log('🔴 tokenExpired 事件已發送');
 }
 
 /**
@@ -107,7 +109,8 @@ export async function apiCall<T = any>(
     
     // 檢查回應內容是否表示 token 失效
     if (isTokenExpired(data)) {
-      console.log('檢測到 TOKEN 失效:', data);
+      console.log('🔴 檢測到 TOKEN 失效:', data);
+      console.log('🔴 觸發 token 失效事件...');
       localStorage.removeItem('token');
       localStorage.removeItem('bonds_user');
       localStorage.removeItem('bonds_account_type');
