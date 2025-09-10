@@ -715,16 +715,10 @@ const CardEditor = () => {
     return ytm.toFixed(2);
   }, [cardData.couponRate, cardData.remainingYears, cardData.paymentFrequency, cardData.nextCouponDate, cardData.issueDate, cardData.maturityType]);
 
-  // 專門處理 YTM 輸入，確保輸入的是百分比值
+  // 專門處理 YTM 輸入，確保輸入的是百分比值（已移除，YTM 不可編輯）
   const handleYTMChange = useCallback((value: string) => {
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue)) {
-      // 直接使用輸入值，因為我們已經在 useEffect 中處理了轉換
-      const formattedValue = Math.round(numValue * 100) / 100; // 四捨五入到小數點第二位
-      setCardData(prev => ({ ...prev, ytm: formattedValue.toString() }));
-    } else {
-      setCardData(prev => ({ ...prev, ytm: value }));
-    }
+    // YTM 現在由系統自動計算，不允許手動編輯
+    return;
   }, []);
 
   // 編輯相關函數
@@ -803,12 +797,22 @@ const CardEditor = () => {
         }
       }
       
+      // 重新計算 YTM
+      let newYTM = prev.ytm;
+      if (newTradingPrice) {
+        const price = parseFloat(newTradingPrice);
+        if (!isNaN(price) && price > 0) {
+          newYTM = calculateYTMValue(price, bond);
+        }
+      }
+      
       return {
         ...prev,
         tradeDirection: direction,
         tradingPrice: newTradingPrice,
         transactionAmount: newTransactionAmount,
-        totalSettlement: newTotalSettlement
+        totalSettlement: newTotalSettlement,
+        ytm: newYTM
       };
     });
   }, []);
@@ -1931,54 +1935,14 @@ return (
                   </div>
                   <div>
                     <Label htmlFor="ytm">到期殖利率 (%)</Label>
-                    {editingFields.has('ytm') ? (
-                      <Input 
-                        id="ytm" 
-                        type="number" 
-                        step="0.01" 
-                        value={tempValues.ytm || cardData.ytm} 
-                        onChange={(e) => setTempValues(prev => ({ ...prev, ytm: e.target.value }))}
-                        onBlur={() => {
-                          handleYTMChange(tempValues.ytm || cardData.ytm);
-                          setEditingFields(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete('ytm');
-                            return newSet;
-                          });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleYTMChange(tempValues.ytm || cardData.ytm);
-                            setEditingFields(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete('ytm');
-                              return newSet;
-                            });
-                          } else if (e.key === 'Escape') {
-                            setEditingFields(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete('ytm');
-                              return newSet;
-                            });
-                          }
-                        }}
-                        className="text-right"
-                        autoFocus
-                      />
-                    ) : (
-                      <div className="relative">
-                        <Input 
-                          id="ytm" 
-                          type="number" 
-                          step="0.01" 
-                          value={cardData.ytm} 
-                          readOnly 
-                          className="bg-gray-50 text-gray-500 cursor-pointer" 
-                          onClick={() => startEditing('ytm')}
-                        />
-                        <Edit3 className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      </div>
-                    )}
+                    <Input 
+                      id="ytm" 
+                      type="number" 
+                      step="0.01" 
+                      value={cardData.ytm} 
+                      readOnly 
+                      className="bg-gray-50 text-gray-500" 
+                    />
                   </div>
                 </div>
 
