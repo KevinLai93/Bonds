@@ -96,6 +96,24 @@ export async function apiCall<T = any>(
         return { error: '認證已過期，請重新登入' };
       }
       
+      // 對於 403 錯誤，也要檢查是否為 token 失效
+      if (response.status === 403) {
+        try {
+          const errorData = await response.json();
+          if (isTokenExpired(errorData)) {
+            console.log('🔴 檢測到 TOKEN 失效 (403):', errorData);
+            console.log('🔴 觸發 token 失效事件...');
+            localStorage.removeItem('token');
+            localStorage.removeItem('bonds_user');
+            localStorage.removeItem('bonds_account_type');
+            triggerTokenExpired(errorData.message || '當前登入已失效，請重新登入');
+            return { error: errorData.message || '當前登入已失效，請重新登入' };
+          }
+        } catch (jsonError) {
+          console.log('403 錯誤無法解析為 JSON:', jsonError);
+        }
+      }
+      
       const errorText = await response.text();
       console.error(`API 錯誤 ${response.status}:`, errorText);
       return { 
