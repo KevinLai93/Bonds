@@ -22,7 +22,7 @@ import { ProfessionalBondCard } from '@/components/ProfessionalBondCard';
 import { useBondSearch } from '@/contexts/BondSearchContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { BondDMModal } from '@/components/bond-dm/BondDMModal';
-import { calculateYTM, calculatePerpetualYTM, type YTMCalculationParams } from '@/utils/ytmCalculator';
+import { calculateYTM, calculatePerpetualYTM, calculateExcelYield, calculateExcelYieldSimple, type YTMCalculationParams, type ExcelYieldParams } from '@/utils/ytmCalculator';
 
 // 格式化數字：添加千分位，當小數點後無數字時不顯示兩位數
 const formatNumber = (value: string | number): string => {
@@ -224,7 +224,7 @@ const CardEditor = () => {
       const transactionAmount = formattedPrice * 0.01 * quantity;
       const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
       const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
-      const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
+      const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount));
       return (transactionAmount + accruedInterest).toFixed(2);
     })(),
         remainingYears: bond.remainingYears?.toString() || '',
@@ -294,7 +294,7 @@ const CardEditor = () => {
           const transactionAmount = formattedPrice * 0.01 * quantity;
           const minAmount = parseFloat(bond.minDenomination?.toString() || '10000');
           const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || '0');
-          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
+          const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount));
           return (transactionAmount + accruedInterest).toFixed(2);
         })(),
         remainingYears: bond.remainingYears?.toString() || '',
@@ -412,7 +412,7 @@ const CardEditor = () => {
           const transactionAmount = formattedPrice * 0.01 * quantity;
           const minAmount = parseFloat(bond.minDenomination?.toString() || prev.minAmount || '10000');
           const accruedInterestPerMinAmount = parseFloat(bond.accruedInterest?.toString() || prev.accruedInterest || '0');
-          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity);
+          const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount));
           return (transactionAmount + accruedInterest).toFixed(2);
         })(),
         remainingYears: bond.remainingYears?.toString() || prev.remainingYears,
@@ -512,8 +512,8 @@ const CardEditor = () => {
       if (d2 === 31 && d1 < 30) d2 = 30;
       if (d2 === 31 && d1 === 30) d2 = 30;
       
-      // 計算天數時 +1，因為要包含當日利息
-      const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1) + 1;
+      // 計算天數（不包含當日，因為是應計利息）
+      const days360 = 360 * (y2 - y1) + 30 * (m2 - m1) + (d2 - d1);
       const periodsPerYear = frequency;
       const daysInPeriod = 360 / periodsPerYear;
       
@@ -572,11 +572,12 @@ const CardEditor = () => {
           const transactionAmount = calculateTransactionAmount(price, qty, 2);
           newData.transactionAmount = transactionAmount;
           
-          // 計算前手息：基於數量計算
-          const quantity = parseFloat(prev.quantity) || 0;
+          // 計算前手息：基於數量計算（僅用於成交金額顯示）
+          const quantity = qty; // 使用新的數量
           const minAmount = parseFloat(prev.minAmount) || 10000;
           const accruedInterestPerMinAmount = parseFloat(prev.accruedInterest) || 0;
-          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
+          const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount)).toFixed(2);
+          // 總成交金額 = 淨價×面額單位 + 應計利息
           newData.totalSettlement = (parseFloat(transactionAmount) + parseFloat(accruedInterest)).toFixed(2);
           
           // 當參考價格改變時，重新計算 YTM
@@ -609,11 +610,12 @@ const CardEditor = () => {
           const calculatedQuantity = (transactionAmount / (price * 0.01)).toFixed(2);
           newData.quantity = calculatedQuantity;
           
-          // 計算前手息：基於數量計算
+          // 計算前手息：基於數量計算（僅用於成交金額顯示）
           const quantity = parseFloat(prev.quantity) || 0;
           const minAmount = parseFloat(prev.minAmount) || 10000;
           const accruedInterestPerMinAmount = parseFloat(prev.accruedInterest) || 0;
-          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
+          const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount)).toFixed(2);
+          // 總成交金額 = 淨價×面額單位 + 應計利息
           newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
           
           // 交易金額不再進行最小承作和最小疊加驗證
@@ -679,7 +681,7 @@ const CardEditor = () => {
         const accruedInterestPerMinAmount = parseFloat(value as string) || 0;
         
         if (transactionAmount > 0 && quantity > 0) {
-          const accruedInterest = ((accruedInterestPerMinAmount / minAmount) * quantity).toFixed(2);
+          const accruedInterest = (accruedInterestPerMinAmount * (quantity / minAmount)).toFixed(2);
           newData.totalSettlement = (transactionAmount + parseFloat(accruedInterest)).toFixed(2);
         }
       }
@@ -698,22 +700,26 @@ const CardEditor = () => {
       return ytm.toFixed(2);
     }
     
-    // 一般債券的 YTM 計算
-    const params: YTMCalculationParams = {
-      price: price,
-      faceValue: 100, // 假設面值為 100
-      couponRate: parseFloat(cardData.couponRate) || 0,
-      yearsToMaturity: parseFloat(cardData.remainingYears) || 0,
-      paymentFrequency: cardData.paymentFrequency === '每年' ? 1 : 
-                       cardData.paymentFrequency === '每半年' ? 2 : 
-                       cardData.paymentFrequency === '每季' ? 4 : 2,
-      nextCouponDate: cardData.nextCouponDate,
-      issueDate: cardData.issueDate
+    // 一般債券的 YTM 計算 - 使用修正的Excel YIELD算法
+    const today = new Date();
+    const maturityDate = new Date(cardData.maturityDate);
+    const frequency = cardData.paymentFrequency === '每年' ? 1 : 
+                     cardData.paymentFrequency === '每半年' ? 2 : 
+                     cardData.paymentFrequency === '每季' ? 4 : 2;
+    
+    const excelParams: ExcelYieldParams = {
+      settlementDate: today,
+      maturityDate: maturityDate,
+      rate: parseFloat(cardData.couponRate) / 100, // 轉換為小數
+      pr: price,
+      redemption: 100,
+      frequency: frequency,
+      basis: 0 // US 30/360
     };
     
-    const ytm = calculateYTM(params);
+    const ytm = calculateExcelYield(excelParams);
     return ytm.toFixed(2);
-  }, [cardData.couponRate, cardData.remainingYears, cardData.paymentFrequency, cardData.nextCouponDate, cardData.issueDate, cardData.maturityType]);
+  }, [cardData.couponRate, cardData.paymentFrequency, cardData.maturityDate, cardData.maturityType]);
 
   // 專門處理 YTM 輸入，確保輸入的是百分比值（已移除，YTM 不可編輯）
   const handleYTMChange = useCallback((value: string) => {
