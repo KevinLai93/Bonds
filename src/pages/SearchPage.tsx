@@ -26,6 +26,7 @@ import { sampleBond, type Bond, filterOptions } from '@/types/bond';
 import { useBondSearch } from '@/contexts/BondSearchContext';
 import Header from '@/components/Header';
 import ISINSearchBox from '@/components/ISINSearchBox';
+import { calculateExcelYield, type ExcelYieldParams } from '@/utils/ytmCalculator';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
@@ -46,10 +47,44 @@ const SearchPage = () => {
   // 優先使用 extendedBond 因為它包含最新的價格數據
   const displayBond = extendedBond || bond;
   const mockBonds: Bond[] = displayBond ? [displayBond] : [sampleBond];
+
+  // 重新計算YTM使用Excel YIELD算法
+  const recalculatedBonds = useMemo(() => {
+    return mockBonds.map(bond => {
+      if (bond.maturityType === '永續') return bond;
+      
+      const today = new Date();
+      const maturityDate = new Date(bond.maturityDate);
+      const frequency = bond.paymentFrequency === '每年' ? 1 : 
+                       bond.paymentFrequency === '每半年' ? 2 : 
+                       bond.paymentFrequency === '每季' ? 4 : 2;
+      
+      // 使用買價計算YTM
+      const price = bond.askPrice || bond.bidPrice || 100;
+      
+      const excelParams: ExcelYieldParams = {
+        settlementDate: today,
+        maturityDate: maturityDate,
+        rate: bond.couponRate / 100,
+        pr: price,
+        redemption: 100,
+        frequency: frequency,
+        basis: 0 // US 30/360
+      };
+      
+      const recalculatedYTM = calculateExcelYield(excelParams);
+      
+      return {
+        ...bond,
+        yieldToMaturity: recalculatedYTM / 100, // 轉換為小數格式以保持一致性
+        originalYTM: bond.yieldToMaturity // 保存原始YTM
+      };
+    });
+  }, [mockBonds]);
   
   // 匯出 Excel 功能
   const handleExportExcel = () => {
-    if (!mockBonds || mockBonds.length === 0) {
+    if (!recalculatedBonds || recalculatedBonds.length === 0) {
       toast.error('沒有資料可以匯出');
       return;
     }
@@ -58,7 +93,7 @@ const SearchPage = () => {
     
     try {
       // 準備工作表資料
-      const worksheetData = mockBonds.map(bond => ({
+      const worksheetData = recalculatedBonds.map(bond => ({
         '債券名稱': bond.name,
         'ISIN': bond.isin,
         '發行人': bond.issuer,
@@ -168,7 +203,7 @@ const SearchPage = () => {
   });
 
   // Always show current bonds (either searched or sample)
-  const filteredBonds = mockBonds;
+  const filteredBonds = recalculatedBonds;
 
   const toggleColumn = (column: string) => {
     setSelectedColumns(prev => ({
@@ -287,6 +322,9 @@ const SearchPage = () => {
               </CardTitle>
               <div className="text-sm text-muted-foreground">
                 {bond ? `已找到 ISIN: ${bond.isin}` : '範例資料'}
+                <span className="ml-2 text-xs text-blue-600">
+                  (YTM使用Excel YIELD算法重新計算)
+                </span>
               </div>
             </div>
           </CardHeader>
@@ -403,7 +441,7 @@ function renderCellValue(bond: Bond, column: string): React.ReactNode {
     case 'couponRate':
       return `${(value as number).toFixed(2)}%`;
     case 'yieldToMaturity':
-      // 顯示實際的到期殖利率（API 返回的是小數格式，如 0.043 = 4.3%）
+      // 顯示重新計算的到期殖利率（使用Excel YIELD算法）
       return value && (value as number) > 0 ? `${((value as number) * 100).toFixed(2)}%` : '—';
     case 'bidPrice':
     case 'askPrice':

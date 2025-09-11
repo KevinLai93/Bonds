@@ -1,5 +1,5 @@
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useBondSearch } from '@/contexts/BondSearchContext';
 import { 
   ArrowLeft, 
@@ -22,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { sampleBond, type Bond } from '@/types/bond';
 import Header from '@/components/Header';
 import { BondDMModal } from '@/components/bond-dm/BondDMModal';
+import { calculateExcelYield, type ExcelYieldParams } from '@/utils/ytmCalculator';
 import * as XLSX from 'xlsx';
 
 const BondDetail = () => {
@@ -48,6 +49,32 @@ const BondDetail = () => {
   
   // 如果沒有匹配的債券資料，重定向到搜尋頁面
   if (!displayBond) return <Navigate to="/search" replace />;
+
+  // 重新計算YTM使用Excel YIELD算法
+  const recalculatedYTM = useMemo(() => {
+    if (!displayBond || displayBond.maturityType === '永續') return null;
+    
+    const today = new Date();
+    const maturityDate = new Date(displayBond.maturityDate);
+    const frequency = displayBond.paymentFrequency === '每年' ? 1 : 
+                     displayBond.paymentFrequency === '每半年' ? 2 : 
+                     displayBond.paymentFrequency === '每季' ? 4 : 2;
+    
+    // 使用買價計算YTM
+    const price = displayBond.askPrice || displayBond.bidPrice || 100;
+    
+    const excelParams: ExcelYieldParams = {
+      settlementDate: today,
+      maturityDate: maturityDate,
+      rate: displayBond.couponRate / 100,
+      pr: price,
+      redemption: 100,
+      frequency: frequency,
+      basis: 0 // US 30/360
+    };
+    
+    return calculateExcelYield(excelParams);
+  }, [displayBond]);
 
   // 強制重新計算前手息（用於調試）
   const recalculateAccruedInterest = (bond: any) => {
@@ -545,8 +572,15 @@ const BondDetail = () => {
                   <p className="text-2xl font-bold text-success">
                     {displayBond.maturityType === '永續' 
                       ? 'N/A' 
-                      : `${(displayBond.yieldToMaturity * 100).toFixed(2)}%`}
+                      : recalculatedYTM 
+                        ? `${recalculatedYTM.toFixed(2)}%`
+                        : `${(displayBond.yieldToMaturity * 100).toFixed(2)}%`}
                   </p>
+                  {recalculatedYTM && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      使用Excel YIELD算法
+                    </p>
+                  )}
                 </div>
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Ask Price</p>
