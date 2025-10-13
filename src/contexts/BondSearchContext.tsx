@@ -993,9 +993,35 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
     }));
 
     try {
-      // 並行調用所有 API 端點（使用中文版本）
-      const [emissionsResponse, tradingsResponse, flowsResponse, defaultsResponse, optionsResponse, guarantorsResponse] = await Promise.allSettled([
-        (cbondsAPI as any).getEmissions(isin, 'cht'),
+      // 🚀 優化策略：先檢查債券是否存在
+      console.log('🔍 步驟 1: 檢查債券是否存在...');
+      const emissionsResponse = await (cbondsAPI as any).getEmissions(isin, 'cht');
+      
+      // 如果沒有找到債券，直接返回錯誤
+      if (!emissionsResponse?.items?.length) {
+        const errorMsg = `未找到 ISIN: ${isin} 的債券資料`;
+        setState(prev => ({ ...prev, error: errorMsg, loading: false }));
+        throw new Error(errorMsg);
+      }
+
+      console.log('✅ 債券存在，開始載入詳細資料...');
+      
+      // 🚀 先處理基本資料，確認有資料後再載入其他
+      const emission = emissionsResponse.items[0];
+      const baseBond = mapEmissionToBond(emission, null); // 先不傳 emitentInfo
+      
+      // 🚀 先顯示基本資料
+      console.log('📊 步驟 2: 顯示基本債券資料...');
+      setState(prev => ({ 
+        ...prev, 
+        bond: baseBond,
+        extendedBond: baseBond, // 先用基本資料
+        loading: false
+      }));
+
+      // 🚀 步驟 3: 並行調用其他 API 端點（確認有資料後才執行）
+      console.log('📈 步驟 3: 載入詳細資料...');
+      const [tradingsResponse, flowsResponse, defaultsResponse, optionsResponse, guarantorsResponse] = await Promise.allSettled([
         cbondsAPI.getTradingsNew(isin),
         cbondsAPI.getFlowNew(isin),
         cbondsAPI.getEmissionDefault(isin),
@@ -1005,9 +1031,9 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
 
       // 獲取發行人詳細信息（中文版本）
       let emitentInfo = null;
-      if (emissionsResponse.status === 'fulfilled' && emissionsResponse.value?.items?.[0]?.emitent_id) {
+      if (emissionsResponse?.items?.[0]?.emitent_id) {
         try {
-          const emitentResponse = await cbondsAPI.getEmitents(emissionsResponse.value.items[0].emitent_id, 'cht');
+          const emitentResponse = await cbondsAPI.getEmitents(emissionsResponse.items[0].emitent_id, 'cht');
           if (emitentResponse?.items?.[0]) {
             emitentInfo = emitentResponse.items[0];
             console.log('發行人信息（中文）:', emitentInfo);
@@ -1020,23 +1046,7 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
         }
       }
 
-      // 處理發行資料（必需）
-      if (emissionsResponse.status === 'rejected' || !emissionsResponse.value?.items || emissionsResponse.value.items.length === 0) {
-        const errorMsg = '查無此 ISIN 代碼的債券資料';
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          error: errorMsg,
-          bond: null,
-          extendedBond: null
-        }));
-        throw new Error(errorMsg);
-      }
-
-      const emission = emissionsResponse.value.items[0];
-      const baseBond = mapEmissionToBond(emission, emitentInfo);
-
-      // 處理其他 API 回應（可選）
+      // 🚀 步驟 4: 處理其他 API 回應（可選）
       console.log('交易數據 API 回應:', tradingsResponse);
       const tradingData = tradingsResponse.status === 'fulfilled' ? 
         processTradingData(tradingsResponse.value) : [];
@@ -1054,7 +1064,7 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
       const guarantors = guarantorsResponse.status === 'fulfilled' ? 
         processGuarantorData(guarantorsResponse.value) : [];
 
-      // 創建擴展債券資料
+      // 創建完整的擴展債券資料
       console.log('創建擴展債券前的數據:', {
         baseBond: { bidPrice: baseBond.bidPrice, askPrice: baseBond.askPrice, yieldToMaturity: baseBond.yieldToMaturity },
         tradingDataLength: tradingData.length,
@@ -1077,10 +1087,10 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
         yieldToMaturity: extendedBond.yieldToMaturity
       });
 
+      // 🚀 更新為完整資料
+      console.log('✅ 步驟 4: 更新為完整資料...');
       setState(prev => ({ 
         ...prev, 
-        loading: false, 
-        bond: baseBond,
         extendedBond,
         error: null
       }));

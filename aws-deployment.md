@@ -12,11 +12,11 @@ VITE_FORCE_HTTPS=true
 VITE_AUTO_PROTOCOL_DETECTION=true
 
 # 生產環境 API 端點（同一台服務器，不同端口）
-VITE_PROD_API_BASE_URL_HTTPS=https://your-aws-domain.com:3000
-VITE_API_BASE_URL_HTTPS=https://your-aws-domain.com:3000
+VITE_PROD_API_BASE_URL_HTTPS=https://bonds.euf.world
+VITE_API_BASE_URL_HTTPS=https://bonds.euf.world
 
 # API 端口配置
-VITE_API_PORT=3000
+VITE_API_PORT=80
 
 # Supabase 配置（如果使用）
 VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
