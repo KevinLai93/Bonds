@@ -48,24 +48,21 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
       // 優化 html2canvas 設置 - 修正跑版問題
       const canvas = await html2canvas(dmRef.current, {
         scale: 2, // 降低解析度避免跑版
-        useCORS: false, // 關閉 CORS 檢查
-        allowTaint: true, // 允許跨域圖片
+        useCORS: true, // 啟用 CORS 檢查
+        allowTaint: false, // 不允許跨域圖片污染
         backgroundColor: '#ffffff',
         width: 794, // 固定 A4 寬度
         height: 1123, // 固定 A4 高度
         logging: false,
         removeContainer: true,
         onclone: (clonedDoc) => {
-          // 確保 Logo 圖片在克隆文檔中正確載入
+          // 處理跨域圖片問題 - 替換為本地圖片
           const clonedImages = clonedDoc.querySelectorAll('img');
           clonedImages.forEach((img) => {
             if (img instanceof HTMLImageElement) {
-              // 確保圖片完全載入
-              if (!img.complete || img.naturalHeight === 0) {
-                // 如果圖片未載入，重新設定 src
-                const originalSrc = img.src;
-                img.src = '';
-                img.src = originalSrc;
+              // 如果是跨域圖片，替換為本地預設圖片
+              if (img.src.includes('s3.ap-northeast-1.amazonaws.com')) {
+                img.src = '/euf.png'; // 使用本地圖片避免 CORS 問題
               }
               // 確保圖片樣式正確
               img.style.cssText += `
