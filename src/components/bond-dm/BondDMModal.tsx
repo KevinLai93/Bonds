@@ -77,28 +77,8 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      // 計算正確的寬高比，避免壓扁
-      const canvasAspectRatio = canvas.width / canvas.height;
-      const pageAspectRatio = pageWidth / pageHeight;
-      
-      let imgWidth, imgHeight;
-      
-      if (canvasAspectRatio > pageAspectRatio) {
-        // Canvas 比較寬，以寬度為準
-        imgWidth = pageWidth;
-        imgHeight = pageWidth / canvasAspectRatio;
-      } else {
-        // Canvas 比較高，以高度為準
-        imgHeight = pageHeight;
-        imgWidth = pageHeight * canvasAspectRatio;
-      }
-      
-      // 居中放置圖片
-      const x = (pageWidth - imgWidth) / 2;
-      const y = (pageHeight - imgHeight) / 2;
-      
-      // 添加圖片到 PDF
-      pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+      // 滿版顯示，直接填滿整個 A4 頁面
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
       
       // 生成檔案名稱
       const fileName = `${bond.name}-債券資訊-${new Date().toISOString().split('T')[0]}.pdf`;
