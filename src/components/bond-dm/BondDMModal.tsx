@@ -256,15 +256,22 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
         }
       });
 
-      const imgData = canvas.toDataURL('image/png', 1.0);
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      // 使用更簡單的方式生成 PDF
+      const imgData = canvas.toDataURL('image/png');
       
-      // A4 標準尺寸 (mm)
-      const pdfWidth = 210;
-      const pdfHeight = 297;
+      // 創建 PDF 實例
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
       
-      // 簡化 PDF 生成，直接使用 A4 尺寸
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // 獲取 A4 尺寸
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // 添加圖片到 PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
       
       // 生成檔案名稱
       const fileName = `${bond.name}-債券資訊-${new Date().toISOString().split('T')[0]}.pdf`;
