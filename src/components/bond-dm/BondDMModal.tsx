@@ -14,12 +14,12 @@ interface BondDMModalProps {
   tradeDirection?: string; // 客戶需求：買/賣
 }
 
-export const BondDMModal: React.FC<BondDMModalProps> = ({
-  bond,
-  isOpen,
+export const BondDMModal: React.FC<BondDMModalProps> = ({ 
+  bond, 
+  isOpen, 
   onClose,
   transactionAmount,
-  tradeDirection
+  tradeDirection 
 }) => {
   const dmRef = useRef<HTMLDivElement>(null);
 
@@ -69,22 +69,22 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
                 
                 if (img.src.includes('darwin.png')) {
                   console.log('🦘 替換為 Darwin Logo');
-                  img.src = '/darwin.png';
+                  img.src = window.location.origin + '/darwin.png';
                 } else if (img.src.includes('esun.png')) {
                   console.log('🏦 替換為玉山 Logo');
-                  img.src = '/esun.png';
+                  img.src = window.location.origin + '/esun.png';
                 } else if (img.src.includes('hua-nan-logo.png')) {
                   console.log('🏢 替換為華南 Logo');
-                  img.src = '/hua-nan-logo.png';
+                  img.src = window.location.origin + '/hua-nan-logo.png';
                 } else if (img.src.includes('masterlink.png')) {
                   console.log('📊 替換為元富 Logo');
-                  img.src = '/masterlink.png';
+                  img.src = window.location.origin + '/masterlink.png';
                 } else if (img.src.includes('ubot-logo.png')) {
                   console.log('🤖 替換為 Ubot Logo');
-                  img.src = '/ubot-logo.png';
+                  img.src = window.location.origin + '/ubot-logo.png';
                 } else {
                   console.log('🔄 替換為預設 EUF Logo');
-                  img.src = '/euf.png';
+                  img.src = window.location.origin + '/euf.png';
                 }
                 
                 console.log('✅ 新圖片路徑:', img.src);
