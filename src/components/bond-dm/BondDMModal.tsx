@@ -14,27 +14,68 @@ interface BondDMModalProps {
   tradeDirection?: string; // 客戶需求：買/賣
 }
 
-export const BondDMModal: React.FC<BondDMModalProps> = ({ 
-  bond, 
-  isOpen, 
+export const BondDMModal: React.FC<BondDMModalProps> = ({
+  bond,
+  isOpen,
   onClose,
   transactionAmount,
-  tradeDirection 
+  tradeDirection
 }) => {
   const dmRef = useRef<HTMLDivElement>(null);
+
+  // 將網路圖片轉換為 base64
+  const convertImageToBase64 = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        const base64 = canvas.toDataURL('image/png');
+        resolve(base64);
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  };
 
   const downloadPDF = async () => {
     if (!dmRef.current) return;
 
     try {
-      // 等待所有圖片載入完成
+      // 將所有網路圖片轉換為 base64，確保 PDF 生成時能正確顯示
       const images = dmRef.current.querySelectorAll('img');
-      const imagePromises = Array.from(images).map((img) => {
+      const imagePromises = Array.from(images).map(async (img) => {
         return new Promise((resolve) => {
           if (img.complete && img.naturalHeight !== 0) {
-            resolve(img);
+            // 如果是網路圖片，轉換為 base64
+            if (img.src.startsWith('http')) {
+              convertImageToBase64(img.src).then((base64) => {
+                if (base64) {
+                  img.src = base64;
+                }
+                resolve(img);
+              }).catch(() => resolve(img));
+            } else {
+              resolve(img);
+            }
           } else {
-            img.onload = () => resolve(img);
+            img.onload = () => {
+              // 載入完成後轉換為 base64
+              if (img.src.startsWith('http')) {
+                convertImageToBase64(img.src).then((base64) => {
+                  if (base64) {
+                    img.src = base64;
+                  }
+                  resolve(img);
+                }).catch(() => resolve(img));
+              } else {
+                resolve(img);
+              }
+            };
             img.onerror = () => resolve(img); // 即使載入失敗也繼續
           }
         });
