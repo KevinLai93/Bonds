@@ -57,25 +57,37 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
         onclone: (clonedDoc) => {
           // 處理跨域圖片問題 - 根據不同帳號類型使用對應的本地圖片
           const clonedImages = clonedDoc.querySelectorAll('img');
-          clonedImages.forEach((img) => {
+          console.log('🔍 onclone: 找到', clonedImages.length, '個圖片');
+          
+          clonedImages.forEach((img, index) => {
             if (img instanceof HTMLImageElement) {
+              console.log(`🖼️ 圖片 ${index + 1}:`, img.src);
+              
               // 如果是跨域圖片，根據 URL 判斷使用哪個本地圖片
               if (img.src.includes('s3.ap-northeast-1.amazonaws.com')) {
+                console.log('🌐 發現跨域圖片:', img.src);
+                
                 if (img.src.includes('darwin.png')) {
-                  // Darwin Logo 使用本地 Darwin Logo
+                  console.log('🦘 替換為 Darwin Logo');
                   img.src = '/darwin.png';
                 } else if (img.src.includes('esun.png')) {
+                  console.log('🏦 替換為玉山 Logo');
                   img.src = '/esun.png';
                 } else if (img.src.includes('hua-nan-logo.png')) {
+                  console.log('🏢 替換為華南 Logo');
                   img.src = '/hua-nan-logo.png';
                 } else if (img.src.includes('masterlink.png')) {
+                  console.log('📊 替換為元富 Logo');
                   img.src = '/masterlink.png';
                 } else if (img.src.includes('ubot-logo.png')) {
+                  console.log('🤖 替換為 Ubot Logo');
                   img.src = '/ubot-logo.png';
                 } else {
-                  // 其他情況使用 EUF Logo
+                  console.log('🔄 替換為預設 EUF Logo');
                   img.src = '/euf.png';
                 }
+                
+                console.log('✅ 新圖片路徑:', img.src);
               }
             }
           });
