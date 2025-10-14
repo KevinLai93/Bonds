@@ -23,11 +23,13 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
   const getLogoSource = () => {
     // 優先使用 API 回傳的 logo_url
     if (user?.logo_url) {
+      console.log('ProfileLogo: 使用 API logo_url:', user.logo_url);
       // 添加時間戳防止快取
       const timestamp = new Date().getTime();
       return `${user.logo_url}?t=${timestamp}`;
     }
 
+    console.log('ProfileLogo: 沒有 API logo_url，使用預設路徑');
     // 如果沒有 API logo_url，使用預設的硬編碼路徑（向後相容）
     if (!accountType) {
       // 預設顯示 EUF logo
@@ -89,6 +91,7 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
       onLoad={(e) => {
         // 確保圖片載入完成
         const img = e.target as HTMLImageElement;
+        console.log('ProfileLogo: 圖片載入成功:', img.src);
         if (img) {
           img.style.opacity = '1';
         }
@@ -96,7 +99,9 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
       onError={(e) => {
         // 載入失敗時使用預設圖片
         const img = e.target as HTMLImageElement;
+        console.error('ProfileLogo: 圖片載入失敗:', img.src);
         if (img && img.src !== '/euf.png') {
+          console.log('ProfileLogo: 切換到預設圖片');
           img.src = '/euf.png';
         }
       }}
