@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import Header from '@/components/Header';
 import EUFLogo from '@/components/EUFLogo';
+import LogoDebug from '@/components/LogoDebug';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +52,9 @@ const Index = () => {
       <Header />
       
       <main className="container mx-auto px-4 py-12">
+        {/* Logo 調試資訊 */}
+        <LogoDebug />
+        
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
