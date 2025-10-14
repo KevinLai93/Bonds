@@ -1010,13 +1010,12 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
       const emission = emissionsResponse.items[0];
       const baseBond = mapEmissionToBond(emission, null); // 先不傳 emitentInfo
       
-      // 🚀 先顯示基本資料
+      // 🚀 先顯示基本資料（但保持 loading 狀態）
       console.log('📊 步驟 2: 顯示基本債券資料...');
       setState(prev => ({ 
         ...prev, 
         bond: baseBond,
-        extendedBond: baseBond, // 先用基本資料
-        loading: false
+        extendedBond: baseBond // 先用基本資料，但保持 loading: true
       }));
 
       // 🚀 步驟 3: 並行調用其他 API 端點（確認有資料後才執行）
@@ -1087,11 +1086,12 @@ export const BondSearchProvider: React.FC<{ children: ReactNode }> = ({ children
         yieldToMaturity: extendedBond.yieldToMaturity
       });
 
-      // 🚀 更新為完整資料
+      // 🚀 更新為完整資料並結束 loading
       console.log('✅ 步驟 4: 更新為完整資料...');
       setState(prev => ({ 
         ...prev, 
         extendedBond,
+        loading: false, // 所有 API 調用完成後才結束 loading
         error: null
       }));
     } catch (error) {

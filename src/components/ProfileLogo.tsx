@@ -12,9 +12,15 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
   size = 64, 
   alt = "Logo" 
 }) => {
-  const { accountType } = useAuth();
+  const { accountType, user } = useAuth();
 
   const getLogoSource = () => {
+    // 優先使用 API 回傳的 logo_url
+    if (user?.logo_url) {
+      return user.logo_url;
+    }
+
+    // 如果沒有 API logo_url，使用預設的硬編碼路徑（向後相容）
     if (!accountType) {
       // 預設顯示 EUF logo
       return "/euf.png";
@@ -29,6 +35,8 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
         return "/masterlink.png";
       case 'esun':
         return "/esun.png";
+      case 'darwin':
+        return "/euf.png"; // 達盈暫時使用 EUF logo，之後可以上傳專屬 logo
       default:
         // 其他類型顯示 EUF logo
         return "/euf.png";
@@ -36,6 +44,12 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
   };
 
   const getAltText = () => {
+    // 如果有 API logo_url，使用用戶名稱作為 alt 文字
+    if (user?.logo_url) {
+      return `${user.name} Logo`;
+    }
+
+    // 使用預設的硬編碼 alt 文字（向後相容）
     if (!accountType) {
       return "EUF Logo";
     }
@@ -49,6 +63,8 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
         return "元富證券";
       case 'esun':
         return "玉山銀行";
+      case 'darwin':
+        return "達盈 Logo";
       default:
         return "EUF Logo";
     }

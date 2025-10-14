@@ -9,6 +9,7 @@ interface User {
   role: string;
   name: string;
   email?: string;
+  logo_url?: string;
 }
 
 interface AccountType {
@@ -17,9 +18,16 @@ interface AccountType {
   category: string;
 }
 
+interface BrandColors {
+  theme_color: string;
+  auxiliary_color: string;
+  background_color: string;
+}
+
 interface AuthContextType {
   user: User | null;
   accountType: AccountType | null;
+  brandColors: BrandColors | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -43,6 +51,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accountType, setAccountType] = useState<AccountType | null>(null);
+  const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -50,6 +59,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const savedUser = localStorage.getItem('bonds_user');
     const savedAccountType = localStorage.getItem('bonds_account_type');
+    const savedBrandColors = localStorage.getItem('bonds_brand_colors');
     const token = localStorage.getItem('token');
     
     if (savedUser && token) {
@@ -61,10 +71,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const accountTypeData = JSON.parse(savedAccountType);
           setAccountType(accountTypeData);
         }
+        
+        if (savedBrandColors) {
+          const brandColorsData = JSON.parse(savedBrandColors);
+          setBrandColors(brandColorsData);
+        }
       } catch (error) {
         console.error('Error parsing saved user data:', error);
         localStorage.removeItem('bonds_user');
         localStorage.removeItem('bonds_account_type');
+        localStorage.removeItem('bonds_brand_colors');
         localStorage.removeItem('token');
       }
     }
@@ -75,8 +91,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     cbondsAPI.logout();
     setUser(null);
     setAccountType(null);
+    setBrandColors(null);
     localStorage.removeItem('bonds_user');
     localStorage.removeItem('bonds_account_type');
+    localStorage.removeItem('bonds_brand_colors');
     localStorage.removeItem('token');
   };
 
@@ -114,21 +132,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           username: response.user.username,
           role: response.user.role,
           name: response.user.name,
-          email: response.user.email
+          email: response.user.email,
+          logo_url: response.user.logo_url
         };
         
         setUser(userData);
         localStorage.setItem('bonds_user', JSON.stringify(userData));
         
-        // 獲取 accountType 信息
-        try {
-          const profileResponse = await cbondsAPI.getProfile();
-          if (profileResponse.success && profileResponse.accountType) {
-            setAccountType(profileResponse.accountType);
-            localStorage.setItem('bonds_account_type', JSON.stringify(profileResponse.accountType));
+        // 設置 accountType 和 brandColors
+        if (response.accountType) {
+          setAccountType(response.accountType);
+          localStorage.setItem('bonds_account_type', JSON.stringify(response.accountType));
+        }
+        
+        if (response.brandColors) {
+          setBrandColors(response.brandColors);
+          localStorage.setItem('bonds_brand_colors', JSON.stringify(response.brandColors));
+        }
+        
+        // 如果登入回應中沒有 brandColors，嘗試從 profile 獲取
+        if (!response.brandColors) {
+          try {
+            const profileResponse = await cbondsAPI.getProfile();
+            if (profileResponse.success) {
+              if (profileResponse.accountType) {
+                setAccountType(profileResponse.accountType);
+                localStorage.setItem('bonds_account_type', JSON.stringify(profileResponse.accountType));
+              }
+              if (profileResponse.brandColors) {
+                setBrandColors(profileResponse.brandColors);
+                localStorage.setItem('bonds_brand_colors', JSON.stringify(profileResponse.brandColors));
+              }
+            }
+          } catch (profileError) {
+            console.warn('Failed to fetch profile data:', profileError);
           }
-        } catch (profileError) {
-          console.warn('Failed to fetch account type:', profileError);
         }
         
         return true;
@@ -143,6 +181,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     user,
     accountType,
+    brandColors,
     isAuthenticated: !!user,
     login,
     logout,

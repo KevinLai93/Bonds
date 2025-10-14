@@ -16,10 +16,15 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
   transactionAmount,
   tradeDirection 
 }) => {
-  const { accountType } = useAuth();
+  const { accountType, brandColors } = useAuth();
   
-  // 根據 accountType 獲取主題色
+  // 使用 API 傳遞的品牌色系，如果沒有則使用預設值
   const getThemeColor = () => {
+    if (brandColors?.theme_color) {
+      return brandColors.theme_color;
+    }
+    
+    // 預設色系（向後相容）
     if (!accountType) {
       return '#54b5e9'; // 預設 EUF 顏色
     }
@@ -33,13 +38,20 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#E8180E'; // 元富紅
       case 'esun':
         return '#019c97'; // 玉山綠
+      case 'darwin':
+        return '#015caf'; // 達盈藍
       default:
         return '#54b5e9'; // EUF 顏色
     }
   };
 
-  // 根據 accountType 獲取輔助色（用於資訊區塊）
+  // 使用 API 傳遞的輔助色，如果沒有則使用預設值
   const getAuxiliaryColor = () => {
+    if (brandColors?.auxiliary_color) {
+      return brandColors.auxiliary_color;
+    }
+    
+    // 預設色系（向後相容）
     if (!accountType) {
       return '#9d5bc3'; // 預設 EUF 紫色
     }
@@ -53,6 +65,8 @@ export const OriginalBondDM: React.FC<OriginalBondDMProps> = ({
         return '#E8180E'; // 元富紅
       case 'esun':
         return '#019c97'; // 玉山綠
+      case 'darwin':
+        return '#ffb21b'; // 達盈黃
       default:
         return '#9d5bc3'; // EUF 紫色
     }

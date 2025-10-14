@@ -125,10 +125,16 @@ interface ThemeConfig {
 const CardEditor = () => {
   const { isin } = useParams<{ isin: string }>();
   const { bond: searchedBond, extendedBond, searchByISIN } = useBondSearch();
-  const { accountType } = useAuth();
+  const { accountType, brandColors } = useAuth();
   
   // 根據 accountType 獲取標題背景色
   const getHeaderBackgroundColor = () => {
+    // 優先使用 API 傳遞的品牌色系
+    if (brandColors?.theme_color) {
+      return brandColors.theme_color;
+    }
+    
+    // 預設色系（向後相容）
     if (!accountType) {
       return '#54b5e9'; // 預設 EUF 顏色
     }
@@ -142,6 +148,8 @@ const CardEditor = () => {
         return '#E8180E'; // 元富紅
       case 'esun':
         return '#019c97'; // 玉山綠
+      case 'darwin':
+        return '#015caf'; // 達盈藍
       default:
         return '#54b5e9'; // EUF 顏色
     }
