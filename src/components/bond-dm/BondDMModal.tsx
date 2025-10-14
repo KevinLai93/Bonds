@@ -49,7 +49,8 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
       const canvas = await html2canvas(dmRef.current, {
         scale: 3, // 提高解析度以獲得更好的文字渲染
         useCORS: true,
-        allowTaint: true, // 改為 true 以允許跨域圖片
+        allowTaint: true, // 允許跨域圖片
+        foreignObjectRendering: true, // 啟用外部物件渲染
         backgroundColor: '#ffffff',
         width: undefined, // 讓 html2canvas 自動計算寬度
         height: undefined, // 讓 html2canvas 自動計算高度
