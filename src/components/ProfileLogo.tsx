@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProfileLogoProps {
@@ -13,11 +13,19 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
   alt = "Logo" 
 }) => {
   const { accountType, user } = useAuth();
+  const [logoKey, setLogoKey] = useState(0);
+
+  // 當用戶或帳號類型改變時，強制重新載入 Logo
+  useEffect(() => {
+    setLogoKey(prev => prev + 1);
+  }, [user?.id, user?.logo_url, accountType?.type]);
 
   const getLogoSource = () => {
     // 優先使用 API 回傳的 logo_url
     if (user?.logo_url) {
-      return user.logo_url;
+      // 添加時間戳防止快取
+      const timestamp = new Date().getTime();
+      return `${user.logo_url}?t=${timestamp}`;
     }
 
     // 如果沒有 API logo_url，使用預設的硬編碼路徑（向後相容）
@@ -72,6 +80,7 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
 
   return (
     <img
+      key={logoKey} // 使用 key 強制重新渲染
       src={getLogoSource()}
       alt={alt || getAltText()}
       className={`object-contain h-full w-auto ${className}`}
