@@ -23,13 +23,11 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
   const getLogoSource = () => {
     // 優先使用 API 回傳的 logo_url
     if (user?.logo_url) {
-      console.log('ProfileLogo: 使用 API logo_url:', user.logo_url);
       // 添加時間戳防止快取
       const timestamp = new Date().getTime();
       return `${user.logo_url}?t=${timestamp}`;
     }
 
-    console.log('ProfileLogo: 沒有 API logo_url，使用預設路徑');
     // 如果沒有 API logo_url，使用預設的硬編碼路徑（向後相容）
     if (!accountType) {
       // 預設顯示 EUF logo

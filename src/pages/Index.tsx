@@ -52,7 +52,6 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-12">
         {/* Logo 調試資訊 */}
-        <LogoDebug />
         
         {/* Hero Section */}
         <div className="text-center mb-12">
