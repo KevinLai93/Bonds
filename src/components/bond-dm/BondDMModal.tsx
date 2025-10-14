@@ -45,16 +45,13 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
       // 額外等待 100ms 確保所有資源載入完成
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // 優化 html2canvas 設置 - 修正跑版問題
+      // 簡化 html2canvas 設置避免跑版
       const canvas = await html2canvas(dmRef.current, {
-        scale: 2, // 降低解析度避免跑版
-        useCORS: true, // 啟用 CORS 檢查
-        allowTaint: false, // 不允許跨域圖片污染
+        scale: 1, // 使用原始解析度
+        useCORS: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
-        width: 794, // 固定 A4 寬度
-        height: 1123, // 固定 A4 高度
         logging: false,
-        removeContainer: true,
         onclone: (clonedDoc) => {
           // 處理跨域圖片問題 - 替換為本地圖片
           const clonedImages = clonedDoc.querySelectorAll('img');

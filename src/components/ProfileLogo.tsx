@@ -17,6 +17,11 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
 
   // 當用戶或帳號類型改變時，強制重新載入 Logo
   useEffect(() => {
+    console.log('ProfileLogo: 用戶或帳號類型改變，重新載入 Logo', {
+      userId: user?.id,
+      logo_url: user?.logo_url,
+      accountType: accountType?.type
+    });
     setLogoKey(prev => prev + 1);
   }, [user?.id, user?.logo_url, accountType?.type]);
 
