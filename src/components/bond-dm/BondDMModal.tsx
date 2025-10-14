@@ -256,44 +256,15 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
         }
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const imgData = canvas.toDataURL('image/png', 1.0);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       // A4 標準尺寸 (mm)
       const pdfWidth = 210;
       const pdfHeight = 297;
       
-      // 滿版 PDF 設定 - 減少白邊，讓內容更滿版
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      // 計算縮放比例，優先填滿寬度，讓內容更滿版
-      const scaleX = pdfWidth / imgWidth;
-      const scaleY = pdfHeight / imgHeight;
-      
-      // 使用較大的縮放比例，讓內容更滿版
-      const scale = Math.max(scaleX, scaleY) * 25.4; // 轉換為 mm
-      
-      // 計算最終尺寸
-      const finalWidth = imgWidth * scale / 25.4;
-      const finalHeight = imgHeight * scale / 25.4;
-      
-      // 計算位置，讓內容填滿整個 A4 頁面
-      let offsetX = 0;
-      let offsetY = 0;
-      
-      if (finalWidth > pdfWidth) {
-        // 如果寬度超出，居中顯示
-        offsetX = (finalWidth - pdfWidth) / 2;
-      }
-      
-      if (finalHeight > pdfHeight) {
-        // 如果高度超出，居中顯示
-        offsetY = (finalHeight - pdfHeight) / 2;
-      }
-      
-      // 添加圖片到 PDF，使用滿版設定
-      pdf.addImage(imgData, 'JPEG', -offsetX, -offsetY, finalWidth, finalHeight);
+      // 簡化 PDF 生成，直接使用 A4 尺寸
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
       // 生成檔案名稱
       const fileName = `${bond.name}-債券資訊-${new Date().toISOString().split('T')[0]}.pdf`;
