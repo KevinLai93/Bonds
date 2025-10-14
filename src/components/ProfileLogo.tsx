@@ -100,12 +100,31 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
         }
       }}
       onError={(e) => {
-        // 載入失敗時使用預設圖片
+        // 載入失敗時根據原始 URL 使用對應的本地圖片
         const img = e.target as HTMLImageElement;
         console.error('ProfileLogo: 圖片載入失敗:', img.src);
-        if (img && img.src !== '/euf.png') {
-          console.log('ProfileLogo: 切換到預設圖片');
-          img.src = '/euf.png';
+        
+        if (img) {
+          // 根據原始 URL 判斷應該使用哪個本地圖片
+          if (img.src.includes('darwin.png')) {
+            console.log('ProfileLogo: 切換到本地 Darwin Logo');
+            img.src = '/darwin.png';
+          } else if (img.src.includes('esun.png')) {
+            console.log('ProfileLogo: 切換到本地玉山 Logo');
+            img.src = '/esun.png';
+          } else if (img.src.includes('hua-nan-logo.png')) {
+            console.log('ProfileLogo: 切換到本地華南 Logo');
+            img.src = '/hua-nan-logo.png';
+          } else if (img.src.includes('masterlink.png')) {
+            console.log('ProfileLogo: 切換到本地元富 Logo');
+            img.src = '/masterlink.png';
+          } else if (img.src.includes('ubot-logo.png')) {
+            console.log('ProfileLogo: 切換到本地 Ubot Logo');
+            img.src = '/ubot-logo.png';
+          } else if (img.src !== '/euf.png') {
+            console.log('ProfileLogo: 切換到預設 EUF Logo');
+            img.src = '/euf.png';
+          }
         }
       }}
       style={{ opacity: 0, transition: 'opacity 0.2s' }}
