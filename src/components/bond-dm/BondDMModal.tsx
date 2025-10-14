@@ -55,13 +55,27 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
         width: 794, // 固定 DM 寬度
         height: 1123, // 固定 DM 高度
         onclone: (clonedDoc) => {
-          // 處理跨域圖片問題 - 替換為本地圖片
+          // 處理跨域圖片問題 - 根據不同帳號類型使用對應的本地圖片
           const clonedImages = clonedDoc.querySelectorAll('img');
           clonedImages.forEach((img) => {
             if (img instanceof HTMLImageElement) {
-              // 如果是跨域圖片，替換為本地預設圖片
+              // 如果是跨域圖片，根據 URL 判斷使用哪個本地圖片
               if (img.src.includes('s3.ap-northeast-1.amazonaws.com')) {
-                img.src = '/euf.png'; // 使用本地圖片避免 CORS 問題
+                if (img.src.includes('darwin.png')) {
+                  // Darwin Logo 使用本地 Darwin Logo
+                  img.src = '/darwin.png';
+                } else if (img.src.includes('esun.png')) {
+                  img.src = '/esun.png';
+                } else if (img.src.includes('hua-nan-logo.png')) {
+                  img.src = '/hua-nan-logo.png';
+                } else if (img.src.includes('masterlink.png')) {
+                  img.src = '/masterlink.png';
+                } else if (img.src.includes('ubot-logo.png')) {
+                  img.src = '/ubot-logo.png';
+                } else {
+                  // 其他情況使用 EUF Logo
+                  img.src = '/euf.png';
+                }
               }
             }
           });
