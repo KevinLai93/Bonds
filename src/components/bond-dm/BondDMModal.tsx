@@ -27,17 +27,57 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
     if (!dmRef.current) return;
 
     try {
+      // 等待所有圖片載入完成
+      const images = dmRef.current.querySelectorAll('img');
+      const imagePromises = Array.from(images).map((img) => {
+        return new Promise((resolve) => {
+          if (img.complete && img.naturalHeight !== 0) {
+            resolve(img);
+          } else {
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(img); // 即使載入失敗也繼續
+          }
+        });
+      });
+      
+      await Promise.all(imagePromises);
+      
+      // 額外等待 100ms 確保所有資源載入完成
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // 優化 html2canvas 設置 - 修正跑版問題
       const canvas = await html2canvas(dmRef.current, {
         scale: 3, // 提高解析度以獲得更好的文字渲染
         useCORS: true,
-        allowTaint: false,
+        allowTaint: true, // 改為 true 以允許跨域圖片
         backgroundColor: '#ffffff',
         width: undefined, // 讓 html2canvas 自動計算寬度
         height: undefined, // 讓 html2canvas 自動計算高度
         logging: false,
         removeContainer: true,
         onclone: (clonedDoc) => {
+          // 確保 Logo 圖片在克隆文檔中正確載入
+          const clonedImages = clonedDoc.querySelectorAll('img');
+          clonedImages.forEach((img) => {
+            if (img instanceof HTMLImageElement) {
+              // 確保圖片完全載入
+              if (!img.complete || img.naturalHeight === 0) {
+                // 如果圖片未載入，重新設定 src
+                const originalSrc = img.src;
+                img.src = '';
+                img.src = originalSrc;
+              }
+              // 確保圖片樣式正確
+              img.style.cssText += `
+                object-fit: contain !important;
+                height: auto !important;
+                width: auto !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+              `;
+            }
+          });
+
           // 在克隆的文檔中修正圓圈中文字的垂直對齊問題
           const clonedCircles = clonedDoc.querySelectorAll('.flex.items-center.justify-center');
           clonedCircles.forEach((circle) => {

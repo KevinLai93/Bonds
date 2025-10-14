@@ -75,7 +75,23 @@ const ProfileLogo: React.FC<ProfileLogoProps> = ({
       src={getLogoSource()}
       alt={alt || getAltText()}
       className={`object-contain h-full w-auto ${className}`}
-      loading="lazy"
+      loading="eager" // 改為 eager 確保立即載入
+      crossOrigin="anonymous" // 允許跨域載入
+      onLoad={(e) => {
+        // 確保圖片載入完成
+        const img = e.target as HTMLImageElement;
+        if (img) {
+          img.style.opacity = '1';
+        }
+      }}
+      onError={(e) => {
+        // 載入失敗時使用預設圖片
+        const img = e.target as HTMLImageElement;
+        if (img && img.src !== '/euf.png') {
+          img.src = '/euf.png';
+        }
+      }}
+      style={{ opacity: 0, transition: 'opacity 0.2s' }}
     />
   );
 };
