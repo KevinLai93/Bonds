@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import Header from '@/components/Header';
 import EUFLogo from '@/components/EUFLogo';
-import LogoDebug from '@/components/LogoDebug';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');

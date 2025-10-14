@@ -47,13 +47,12 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
 
       // 優化 html2canvas 設置 - 修正跑版問題
       const canvas = await html2canvas(dmRef.current, {
-        scale: 3, // 提高解析度以獲得更好的文字渲染
-        useCORS: true,
+        scale: 2, // 降低解析度避免跑版
+        useCORS: false, // 關閉 CORS 檢查
         allowTaint: true, // 允許跨域圖片
-        foreignObjectRendering: true, // 啟用外部物件渲染
         backgroundColor: '#ffffff',
-        width: undefined, // 讓 html2canvas 自動計算寬度
-        height: undefined, // 讓 html2canvas 自動計算高度
+        width: 794, // 固定 A4 寬度
+        height: 1123, // 固定 A4 高度
         logging: false,
         removeContainer: true,
         onclone: (clonedDoc) => {
