@@ -45,10 +45,15 @@ export const BondDMModal: React.FC<BondDMModalProps> = ({
       // 額外等待 100ms 確保所有資源載入完成
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      // 找到 DM 內容區域（固定尺寸的 div），只截取 DM 部分
+      const dmContent = dmRef.current.querySelector('div[style*="width: 794px"]') || dmRef.current;
+      
       // 最簡化 html2canvas 設置避免跑版
-      const canvas = await html2canvas(dmRef.current, {
+      const canvas = await html2canvas(dmContent, {
         backgroundColor: '#ffffff',
         logging: false,
+        width: 794, // 固定 DM 寬度
+        height: 1123, // 固定 DM 高度
         onclone: (clonedDoc) => {
           // 處理跨域圖片問題 - 替換為本地圖片
           const clonedImages = clonedDoc.querySelectorAll('img');
